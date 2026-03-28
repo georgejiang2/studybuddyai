@@ -64,6 +64,24 @@
   line-height: 1.5;
 }
 
+/* Error */
+.error {
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+}
+
+[data-theme="dark"] .error {
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
 /* Google */
 .google {
   width: 100%;

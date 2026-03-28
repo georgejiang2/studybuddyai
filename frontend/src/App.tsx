@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { useAuth } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
+import DashboardPage from './pages/DashboardPage';
 import AuthModal from './components/AuthModal';
 
 function App() {
+  const { loading, user } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
@@ -15,6 +18,14 @@ function App() {
     setAuthMode('signup');
     setAuthOpen(true);
   };
+
+  if (loading) {
+    return null;
+  }
+
+  if (user) {
+    return <DashboardPage />;
+  }
 
   return (
     <>
