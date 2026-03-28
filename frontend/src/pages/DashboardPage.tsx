@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
 import { BookOpen, LogOut, Video, Users, Home, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError, type MatchStatus, type SessionJoinPayload, type PartnerProfile } from '../api/client';
@@ -17,10 +17,36 @@ export default function DashboardPage() {
   const [sessionPayload, setSessionPayload] = useState<SessionJoinPayload | null>(null);
   const [partnerProfile, setPartnerProfile] = useState<PartnerProfile | null>(null);
 
+  const [pendingFriendCount, setPendingFriendCount] = useState(0);
+  const friendPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const profile = meData?.profile;
   const subjects = meData?.subjects ?? [];
   const profileDone = meData?.profileCompleted ?? false;
   const displayName = profile?.name || user?.email?.split('@')[0] || 'Student';
+
+  // Poll for pending friend requests
+  const fetchPendingFriends = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await api.getFriends();
+      const pending = res.friendships.filter(
+        (f) => f.status === 'pending' && f.recipientId === user.id,
+      );
+      setPendingFriendCount(pending.length);
+    } catch {
+      // ignore
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!profileDone) return;
+    fetchPendingFriends();
+    friendPollRef.current = setInterval(fetchPendingFriends, 10000);
+    return () => {
+      if (friendPollRef.current) clearInterval(friendPollRef.current);
+    };
+  }, [profileDone, fetchPendingFriends]);
 
   // Check if user already has an active session on load
   useEffect(() => {
@@ -111,10 +137,13 @@ export default function DashboardPage() {
             </button>
             <button
               className={`${styles.tab} ${view === 'friends' ? styles.tabActive : ''}`}
-              onClick={() => setView('friends')}
+              onClick={() => { setView('friends'); fetchPendingFriends(); }}
             >
               <Users size={16} />
               Friends
+              {pendingFriendCount > 0 && (
+                <span className={styles.tabBadge}>{pendingFriendCount}</span>
+              )}
             </button>
           </div>
         </div>

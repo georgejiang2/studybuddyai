@@ -5,8 +5,9 @@ import {
   useTracks,
   useRoomContext,
   useParticipants,
+  useConnectionState,
 } from '@livekit/components-react';
-import { Track } from 'livekit-client';
+import { Track, ConnectionState } from 'livekit-client';
 import {
   Mic,
   MicOff,
@@ -33,6 +34,8 @@ interface Props {
 export default function StudySession({ sessionPayload, partnerProfile, onEnd, onAddFriend }: Props) {
   const [chatOpen, setChatOpen] = useState(false);
   const [friendAdded, setFriendAdded] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const lastSeenCountRef = useRef(0);
 
   const handleAddFriend = async () => {
     if (friendAdded) return;
@@ -54,13 +57,32 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
     onEnd();
   };
 
+  const handleNewMessages = useCallback((count: number) => {
+    if (!chatOpen && count > lastSeenCountRef.current) {
+      setUnreadCount(count - lastSeenCountRef.current);
+    }
+    if (chatOpen) {
+      lastSeenCountRef.current = count;
+      setUnreadCount(0);
+    }
+  }, [chatOpen]);
+
+  const handleChatToggle = () => {
+    if (!chatOpen) {
+      setUnreadCount(0);
+    }
+    setChatOpen(!chatOpen);
+  };
+
   if (!sessionPayload.token || !sessionPayload.livekitUrl) {
     return (
       <FallbackSession
         sessionPayload={sessionPayload}
         partnerProfile={partnerProfile}
         chatOpen={chatOpen}
-        setChatOpen={setChatOpen}
+        onChatToggle={handleChatToggle}
+        unreadCount={unreadCount}
+        onNewMessages={handleNewMessages}
         friendAdded={friendAdded}
         onAddFriend={handleAddFriend}
         onEnd={handleEndSession}
@@ -73,6 +95,8 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
       serverUrl={sessionPayload.livekitUrl}
       token={sessionPayload.token}
       connect={true}
+      audio={true}
+      video={true}
       className={styles.room}
       onDisconnected={handleEndSession}
     >
@@ -80,7 +104,9 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
         sessionPayload={sessionPayload}
         partnerProfile={partnerProfile}
         chatOpen={chatOpen}
-        setChatOpen={setChatOpen}
+        onChatToggle={handleChatToggle}
+        unreadCount={unreadCount}
+        onNewMessages={handleNewMessages}
         friendAdded={friendAdded}
         onAddFriend={handleAddFriend}
         onEnd={handleEndSession}
@@ -93,7 +119,9 @@ function FallbackSession({
   sessionPayload,
   partnerProfile,
   chatOpen,
-  setChatOpen,
+  onChatToggle,
+  unreadCount,
+  onNewMessages,
   friendAdded,
   onAddFriend,
   onEnd,
@@ -101,7 +129,9 @@ function FallbackSession({
   sessionPayload: SessionJoinPayload;
   partnerProfile: PartnerProfile | null;
   chatOpen: boolean;
-  setChatOpen: (v: boolean) => void;
+  onChatToggle: () => void;
+  unreadCount: number;
+  onNewMessages: (count: number) => void;
   friendAdded: boolean;
   onAddFriend: () => void;
   onEnd: () => void;
@@ -179,57 +209,27 @@ function FallbackSession({
           {sessionPayload.matchReason}
         </div>
 
-        <div className={styles.controls}>
-          <button
-            className={`${styles.controlBtn} ${!micOn ? styles.controlOff : ''}`}
-            onClick={() => setMicOn(!micOn)}
-            title={micOn ? 'Mute' : 'Unmute'}
-          >
-            {micOn ? <Mic size={20} /> : <MicOff size={20} />}
-          </button>
-          <button
-            className={`${styles.controlBtn} ${!camOn ? styles.controlOff : ''}`}
-            onClick={() => setCamOn(!camOn)}
-            title={camOn ? 'Camera off' : 'Camera on'}
-          >
-            {camOn ? <Video size={20} /> : <VideoOff size={20} />}
-          </button>
-          <button
-            className={`${styles.controlBtn} ${partnerMuted ? styles.controlOff : ''}`}
-            onClick={() => setPartnerMuted(!partnerMuted)}
-            title={partnerMuted ? 'Unmute partner' : 'Mute partner'}
-          >
-            {partnerMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-          </button>
-          <button
-            className={styles.controlBtn}
-            onClick={() => setChatOpen(!chatOpen)}
-            title="Chat"
-          >
-            <MessageCircle size={20} />
-          </button>
-          <button
-            className={`${styles.controlBtn} ${friendAdded ? styles.controlActive : ''}`}
-            onClick={onAddFriend}
-            title={friendAdded ? 'Friend request sent' : 'Add friend'}
-            disabled={friendAdded}
-          >
-            <UserPlus size={20} />
-          </button>
-          <button
-            className={`${styles.controlBtn} ${styles.endBtn}`}
-            onClick={onEnd}
-            title="End session"
-          >
-            <PhoneOff size={20} />
-          </button>
-        </div>
+        <ControlBar
+          micOn={micOn}
+          camOn={camOn}
+          partnerMuted={partnerMuted}
+          chatOpen={chatOpen}
+          unreadCount={unreadCount}
+          friendAdded={friendAdded}
+          onToggleMic={() => setMicOn(!micOn)}
+          onToggleCam={() => setCamOn(!camOn)}
+          onTogglePartnerMute={() => setPartnerMuted(!partnerMuted)}
+          onChatToggle={onChatToggle}
+          onAddFriend={onAddFriend}
+          onEnd={onEnd}
+        />
       </div>
 
       {chatOpen && (
         <ChatPanel
           sessionId={sessionPayload.sessionId}
-          onClose={() => setChatOpen(false)}
+          onClose={onChatToggle}
+          onMessageCount={onNewMessages}
         />
       )}
     </div>
@@ -240,7 +240,9 @@ function SessionContent({
   sessionPayload,
   partnerProfile,
   chatOpen,
-  setChatOpen,
+  onChatToggle,
+  unreadCount,
+  onNewMessages,
   friendAdded,
   onAddFriend,
   onEnd,
@@ -248,33 +250,66 @@ function SessionContent({
   sessionPayload: SessionJoinPayload;
   partnerProfile: PartnerProfile | null;
   chatOpen: boolean;
-  setChatOpen: (v: boolean) => void;
+  onChatToggle: () => void;
+  unreadCount: number;
+  onNewMessages: (count: number) => void;
   friendAdded: boolean;
   onAddFriend: () => void;
   onEnd: () => void;
 }) {
   const room = useRoomContext();
+  const connectionState = useConnectionState();
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [partnerMuted, setPartnerMuted] = useState(false);
+  const [mediaReady, setMediaReady] = useState(false);
   const participants = useParticipants();
   const tracks = useTracks([Track.Source.Camera, Track.Source.Microphone]);
 
+  // Enable camera and mic once connected
   useEffect(() => {
-    room.localParticipant.setCameraEnabled(true);
-    room.localParticipant.setMicrophoneEnabled(true);
-  }, [room]);
+    if (connectionState !== ConnectionState.Connected || mediaReady) return;
+
+    const enableMedia = async () => {
+      try {
+        await room.localParticipant.setCameraEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true);
+        setMediaReady(true);
+      } catch {
+        // retry after a short delay
+        setTimeout(async () => {
+          try {
+            await room.localParticipant.setCameraEnabled(true);
+            await room.localParticipant.setMicrophoneEnabled(true);
+            setMediaReady(true);
+          } catch {
+            // give up silently
+          }
+        }, 1000);
+      }
+    };
+
+    enableMedia();
+  }, [connectionState, room, mediaReady]);
 
   const toggleMic = async () => {
     const next = !micOn;
-    await room.localParticipant.setMicrophoneEnabled(next);
-    setMicOn(next);
+    try {
+      await room.localParticipant.setMicrophoneEnabled(next);
+      setMicOn(next);
+    } catch {
+      // ignore
+    }
   };
 
   const toggleCam = async () => {
     const next = !camOn;
-    await room.localParticipant.setCameraEnabled(next);
-    setCamOn(next);
+    try {
+      await room.localParticipant.setCameraEnabled(next);
+      setCamOn(next);
+    } catch {
+      // ignore
+    }
   };
 
   const togglePartnerMute = () => {
@@ -310,7 +345,7 @@ function SessionContent({
             ) : (
               <div className={styles.videoOff}>
                 <VideoOff size={32} />
-                <span>Camera off</span>
+                <span>{connectionState === ConnectionState.Connected ? 'Camera off' : 'Connecting...'}</span>
               </div>
             )}
             <span className={styles.nameTag}>You</span>
@@ -336,64 +371,121 @@ function SessionContent({
           {sessionPayload.matchReason}
         </div>
 
-        <div className={styles.controls}>
-          <button
-            className={`${styles.controlBtn} ${!micOn ? styles.controlOff : ''}`}
-            onClick={toggleMic}
-            title={micOn ? 'Mute' : 'Unmute'}
-          >
-            {micOn ? <Mic size={20} /> : <MicOff size={20} />}
-          </button>
-          <button
-            className={`${styles.controlBtn} ${!camOn ? styles.controlOff : ''}`}
-            onClick={toggleCam}
-            title={camOn ? 'Camera off' : 'Camera on'}
-          >
-            {camOn ? <Video size={20} /> : <VideoOff size={20} />}
-          </button>
-          <button
-            className={`${styles.controlBtn} ${partnerMuted ? styles.controlOff : ''}`}
-            onClick={togglePartnerMute}
-            title={partnerMuted ? 'Unmute partner' : 'Mute partner'}
-          >
-            {partnerMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-          </button>
-          <button
-            className={styles.controlBtn}
-            onClick={() => setChatOpen(!chatOpen)}
-            title="Chat"
-          >
-            <MessageCircle size={20} />
-          </button>
-          <button
-            className={`${styles.controlBtn} ${friendAdded ? styles.controlActive : ''}`}
-            onClick={onAddFriend}
-            title={friendAdded ? 'Friend request sent' : 'Add friend'}
-            disabled={friendAdded}
-          >
-            <UserPlus size={20} />
-          </button>
-          <button
-            className={`${styles.controlBtn} ${styles.endBtn}`}
-            onClick={onEnd}
-            title="End session"
-          >
-            <PhoneOff size={20} />
-          </button>
-        </div>
+        <ControlBar
+          micOn={micOn}
+          camOn={camOn}
+          partnerMuted={partnerMuted}
+          chatOpen={chatOpen}
+          unreadCount={unreadCount}
+          friendAdded={friendAdded}
+          onToggleMic={toggleMic}
+          onToggleCam={toggleCam}
+          onTogglePartnerMute={togglePartnerMute}
+          onChatToggle={onChatToggle}
+          onAddFriend={onAddFriend}
+          onEnd={onEnd}
+        />
       </div>
 
       {chatOpen && (
         <ChatPanel
           sessionId={sessionPayload.sessionId}
-          onClose={() => setChatOpen(false)}
+          onClose={onChatToggle}
+          onMessageCount={onNewMessages}
         />
       )}
     </>
   );
 }
 
-function ChatPanel({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+function ControlBar({
+  micOn,
+  camOn,
+  partnerMuted,
+  chatOpen,
+  unreadCount,
+  friendAdded,
+  onToggleMic,
+  onToggleCam,
+  onTogglePartnerMute,
+  onChatToggle,
+  onAddFriend,
+  onEnd,
+}: {
+  micOn: boolean;
+  camOn: boolean;
+  partnerMuted: boolean;
+  chatOpen: boolean;
+  unreadCount: number;
+  friendAdded: boolean;
+  onToggleMic: () => void;
+  onToggleCam: () => void;
+  onTogglePartnerMute: () => void;
+  onChatToggle: () => void;
+  onAddFriend: () => void;
+  onEnd: () => void;
+}) {
+  return (
+    <div className={styles.controls}>
+      <button
+        className={`${styles.controlBtn} ${!micOn ? styles.controlOff : ''}`}
+        onClick={onToggleMic}
+        title={micOn ? 'Mute' : 'Unmute'}
+      >
+        {micOn ? <Mic size={20} /> : <MicOff size={20} />}
+      </button>
+      <button
+        className={`${styles.controlBtn} ${!camOn ? styles.controlOff : ''}`}
+        onClick={onToggleCam}
+        title={camOn ? 'Camera off' : 'Camera on'}
+      >
+        {camOn ? <Video size={20} /> : <VideoOff size={20} />}
+      </button>
+      <button
+        className={`${styles.controlBtn} ${partnerMuted ? styles.controlOff : ''}`}
+        onClick={onTogglePartnerMute}
+        title={partnerMuted ? 'Unmute partner' : 'Mute partner'}
+      >
+        {partnerMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+      </button>
+      <button
+        className={`${styles.controlBtn} ${chatOpen ? styles.controlActive : ''}`}
+        onClick={onChatToggle}
+        title="Chat"
+      >
+        <MessageCircle size={20} />
+        {unreadCount > 0 && (
+          <span className={styles.badge}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+        )}
+      </button>
+      <button
+        className={`${styles.controlBtn} ${friendAdded ? styles.controlActive : ''}`}
+        onClick={onAddFriend}
+        title={friendAdded ? 'Friend request sent' : 'Add friend'}
+        disabled={friendAdded}
+      >
+        <UserPlus size={20} />
+      </button>
+      <button
+        className={`${styles.controlBtn} ${styles.endBtn}`}
+        onClick={onEnd}
+        title="End session"
+      >
+        <PhoneOff size={20} />
+      </button>
+    </div>
+  );
+}
+
+function ChatPanel({
+  sessionId,
+  onClose,
+  onMessageCount,
+}: {
+  sessionId: string;
+  onClose: () => void;
+  onMessageCount: (count: number) => void;
+}) {
   const [messages, setMessages] = useState<SessionMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -404,10 +496,11 @@ function ChatPanel({ sessionId, onClose }: { sessionId: string; onClose: () => v
     try {
       const res = await api.getSessionMessages(sessionId);
       setMessages(res.messages);
+      onMessageCount(res.messages.length);
     } catch {
       // ignore
     }
-  }, [sessionId]);
+  }, [sessionId, onMessageCount]);
 
   useEffect(() => {
     fetchMessages();
