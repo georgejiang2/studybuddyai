@@ -75,25 +75,22 @@
 
 /* ── Hero ── */
 .hero {
-  padding: 80px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  height: calc(100vh - 57px);
+  padding: 0 24px;
+  position: relative;
 }
 
 .heroInner {
   max-width: 640px;
-  margin: 0 auto;
-}
-
-.badge {
-  display: inline-block;
-  padding: 5px 14px;
-  margin-bottom: 24px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
 }
 
 .heroTitle {
@@ -101,7 +98,7 @@
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.035em;
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 
 .heroSub {
@@ -109,7 +106,7 @@
   line-height: 1.65;
   color: var(--text-secondary);
   max-width: 520px;
-  margin: 0 auto 36px;
+  margin-bottom: 44px;
 }
 
 .heroBtns {
@@ -118,6 +115,29 @@
   justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* ── Scroll hint ── */
+.scrollHint {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  animation: bounce 2s ease-in-out infinite;
+  transition: color 0.15s;
+}
+
+.scrollHint:hover {
+  color: var(--text-secondary);
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(6px); }
 }
 
 /* ── Buttons ── */
@@ -160,34 +180,6 @@
   border-color: #d4d4d8;
 }
 
-/* ── Stats ── */
-.stats {
-  display: flex;
-  justify-content: center;
-  gap: 48px;
-  padding: 40px 24px 56px;
-  flex-wrap: wrap;
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.statValue {
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.statLabel {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
 /* ── Sections shared ── */
 .sectionInner {
   max-width: 1080px;
@@ -207,6 +199,7 @@
 .steps {
   padding: 72px 0;
   background: var(--bg);
+  scroll-margin-top: 57px;
 }
 
 .stepGrid {
@@ -363,10 +356,6 @@
 
   .featureGrid {
     grid-template-columns: 1fr;
-  }
-
-  .stats {
-    gap: 32px;
   }
 
   .footerInner {

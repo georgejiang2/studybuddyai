@@ -1,4 +1,4 @@
-import { Video, Users, Zap, MessageCircle, ArrowRight, BookOpen } from 'lucide-react';
+import { Video, Users, Zap, MessageCircle, ArrowRight, ChevronDown, BookOpen } from 'lucide-react';
 import styles from './LandingPage.module.css';
 
 interface Props {
@@ -29,12 +29,6 @@ const features = [
   },
 ];
 
-const stats = [
-  { value: '12k+', label: 'Students matched' },
-  { value: '120+', label: 'Universities' },
-  { value: '4.8', label: 'Avg session rating' },
-];
-
 export default function LandingPage({ onLogin, onSignup }: Props) {
   return (
     <div className={styles.page}>
@@ -59,7 +53,6 @@ export default function LandingPage({ onLogin, onSignup }: Props) {
       {/* ── Hero ── */}
       <header className={styles.hero}>
         <div className={styles.heroInner}>
-          <div className={styles.badge}>Now open to all universities</div>
           <h1 className={styles.heroTitle}>
             Stop studying alone.
             <br />
@@ -79,21 +72,15 @@ export default function LandingPage({ onLogin, onSignup }: Props) {
               I already have an account
             </button>
           </div>
+
+          <a href="#how-it-works" className={styles.scrollHint}>
+            <ChevronDown size={20} />
+          </a>
         </div>
       </header>
 
-      {/* ── Social proof ── */}
-      <section className={styles.stats}>
-        {stats.map((s) => (
-          <div key={s.label} className={styles.stat}>
-            <span className={styles.statValue}>{s.value}</span>
-            <span className={styles.statLabel}>{s.label}</span>
-          </div>
-        ))}
-      </section>
-
       {/* ── How it works ── */}
-      <section className={styles.steps}>
+      <section id="how-it-works" className={styles.steps}>
         <div className={styles.sectionInner}>
           <h2 className={styles.sectionTitle}>How it works</h2>
           <div className={styles.stepGrid}>
