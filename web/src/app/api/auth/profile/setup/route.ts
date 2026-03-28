@@ -32,22 +32,18 @@ export async function POST(request: NextRequest) {
   const bio = typeof body.bio === "string" ? body.bio.trim() : "";
   const subjects: unknown[] = Array.isArray(body.subjects) ? body.subjects : [];
 
-  if (!name || !school || !major || !bio || !isAcademicYear(year)) {
-    return badRequest(
-      "Profile requires name, school, major, year, bio, and at least one subject.",
-    );
+  if (!name) {
+    return badRequest("Name is required.");
   }
 
+  const normalizedYear = isAcademicYear(year) ? year : "freshman";
   const subjectList = subjects.filter((subject): subject is string => typeof subject === "string");
-  if (subjectList.length === 0) {
-    return badRequest("Please provide at least one subject tag.");
-  }
 
   upsertProfile(user.id, {
     name,
     school,
     major,
-    year,
+    year: normalizedYear,
     bio,
     subjects: subjectList,
   });

@@ -14,9 +14,14 @@ interface AuthState {
   meData: MeResponse | null;
 }
 
+interface SignupOptions {
+  name?: string;
+  school?: string;
+}
+
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, options?: SignupOptions) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -53,9 +58,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refresh();
   };
 
-  const signup = async (email: string, password: string) => {
+  const signup = async (email: string, password: string, options?: SignupOptions) => {
     const res = await api.signup(email, password);
     setState({ loading: false, user: res.user, meData: null });
+    if (options?.name || options?.school) {
+      try {
+        await api.setupProfile({
+          name: options.name ?? '',
+          school: options.school ?? '',
+          major: '',
+          year: 'freshman',
+          bio: '',
+          subjects: [],
+        });
+      } catch {
+        // partial profile is fine, user will complete it later
+      }
+    }
     await refresh();
   };
 

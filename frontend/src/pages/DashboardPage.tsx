@@ -164,7 +164,7 @@ export default function DashboardPage() {
         <main className={styles.main}>
           <div className={styles.content}>
             {!profileDone ? (
-              <ProfileSetup onDone={refresh} />
+              <ProfileSetup onDone={refresh} existingProfile={profile} existingSubjects={subjects} />
             ) : (
               <>
                 <h1 className={styles.greeting}>Hey, {displayName}</h1>
@@ -206,13 +206,17 @@ export default function DashboardPage() {
   );
 }
 
-function ProfileSetup({ onDone }: { onDone: () => void }) {
-  const [name, setName] = useState('');
-  const [school, setSchool] = useState('');
-  const [major, setMajor] = useState('');
-  const [year, setYear] = useState('');
-  const [bio, setBio] = useState('');
-  const [subjectsRaw, setSubjectsRaw] = useState('');
+function ProfileSetup({ onDone, existingProfile, existingSubjects }: {
+  onDone: () => void;
+  existingProfile?: import('../api/client').Profile | null;
+  existingSubjects?: string[];
+}) {
+  const [name, setName] = useState(existingProfile?.name ?? '');
+  const [school, setSchool] = useState(existingProfile?.school ?? '');
+  const [major, setMajor] = useState(existingProfile?.major ?? '');
+  const [year, setYear] = useState(existingProfile?.year ?? '');
+  const [bio, setBio] = useState(existingProfile?.bio ?? '');
+  const [subjectsRaw, setSubjectsRaw] = useState(existingSubjects?.join(', ') ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 

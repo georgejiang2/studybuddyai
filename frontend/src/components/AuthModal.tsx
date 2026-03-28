@@ -52,7 +52,7 @@ export default function AuthModal({ open, mode, onModeChange, onClose }: AuthMod
 
     try {
       if (mode === 'signup') {
-        await signup(email, password);
+        await signup(email, password, { name, school });
       } else {
         await login(email, password);
       }
