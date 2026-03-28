@@ -1,0 +1,134 @@
+Core Concept
+
+A real-time platform that matches students with compatible study partners based on goals, subjects, and habits—then lets them instantly collaborate via video/audio.
+
+🔑 Core Features
+1. 👤 User Profiles (but lightweight)
+
+Keep this fast—don’t turn it into a full social network.
+
+Required fields:
+
+Name (or username)
+College / School
+Major
+Year (Freshman–Grad)
+Courses / Subjects (tag-based)
+Bio
+Should show a similarity
+
+2. 🤖 AI Matching System (your differentiator)
+
+match people based on their profile
+
+3. 🎥 Live Study Sessions (core experience)
+
+Must-have:
+
+Video + audio (WebRTC)
+Text chat
+“Mute / camera off” options
+mute the other person option
+
+4. 🔄 Matching Flow
+
+User clicks “Start Studying”
+Matching screen (like Omegle)
+Match found → session starts
+
+Show why they matched:
+
+“You both are Computer Science juniors studying Data Structures”
+
+5. 🧑‍🤝‍🧑 Friend System (Retention Engine)
+
+can add a friend
+chat between friends
+
+
+Session UI layout:
+
+Video grid (center)
+Timer (top)
+Chat (side panel)
+Controls (bottom)
+⚙️ Tech Stack (practical)
+Frontend
+React / Next.js
+Tailwind CSS
+WebRTC (for video)
+Backend
+Node.js + Express
+WebSockets (real-time matching)
+PostgreSQL (profiles)
+AI Layer
+Start simple:
+Matching algorithm (custom logic)
+Later:
+Embeddings for similarity
+Behavior-based recommendations
+Infra
+Firebase / Supabase (fast MVP)
+Or:
+AWS + WebRTC servers (TURN/STUN)
+🚀 MVP Scope (what to build first)
+
+If you try to build everything, you’ll never launch.
+
+MVP should include:
+
+Basic profiles
+Subject-based matching
+Video + audio
+Timer
+Simple rating system
+
+That’s it.
+
+💡 What Will Make or Break This
+1. Match quality > everything
+
+If users get bad partners → they leave instantly.
+
+2. Speed
+
+Match should take <5 seconds.
+
+3. Safety
+
+If it feels like Omegle chaos → it’s dead.
+
+4. Niche first
+
+Start with:
+
+One school
+Or one subject (e.g., CS students)
+🔥 Expansion Ideas
+
+Once it works:
+
+AI study assistant in sessions
+Auto-generated summaries
+Group sessions (3–5 people)
+Integration with Google Calendar
+“Exam cram mode” (high demand periods)
+⚠️ Honest Reality Check
+
+This is a great idea, but:
+
+The hardest part is not tech—it’s liquidity (enough users online at once)
+Cold start problem is real
+
+Solution:
+
+Launch in a single college (like Penn State 👀)
+Seed with real users (clubs, classes, Reddit)
+
+If you want, I can:
+
+Design the exact UI screens
+Map out database schema
+Or help you turn this into a pitch / startup idea
+
+Just tell me 👍
