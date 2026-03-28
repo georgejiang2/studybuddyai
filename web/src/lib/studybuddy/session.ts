@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 
-import { getMatch, getSession, getSessionByMatchId } from "@/lib/studybuddy/store";
+import { getMatch, getSession, getSessionByMatchId, getProfile } from "@/lib/studybuddy/store";
 
 function base64Url(input: string) {
   return Buffer.from(input)
@@ -10,12 +10,12 @@ function base64Url(input: string) {
     .replace(/\//g, "_");
 }
 
-function createSignedLiveKitToken(identity: string, roomName: string) {
+function createSignedLiveKitToken(identity: string, roomName: string, name: string) {
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
 
   if (!apiKey || !apiSecret) {
-    return `dev-livekit-token:${identity}:${roomName}`;
+    return "";
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -24,6 +24,7 @@ function createSignedLiveKitToken(identity: string, roomName: string) {
     JSON.stringify({
       iss: apiKey,
       sub: identity,
+      name: name,
       nbf: now,
       exp: now + 60 * 60,
       video: {
@@ -59,11 +60,17 @@ export function getSessionJoinPayload(sessionId: string, userId: string) {
     return null;
   }
 
+  const profile = getProfile(userId);
+  const displayName = profile?.name ?? userId;
+  const partnerId = match.userA === userId ? match.userB : match.userA;
+
   return {
     sessionId: session.id,
     roomName: session.roomName,
-    token: createSignedLiveKitToken(userId, session.roomName),
-    partnerId: match.userA === userId ? match.userB : match.userA,
+    token: createSignedLiveKitToken(userId, session.roomName, displayName),
+    livekitUrl: process.env.NEXT_PUBLIC_LIVEKIT_URL ?? "",
+    partnerId,
+    matchReason: match.reason,
   };
 }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { applySessionCookie } from "@/lib/studybuddy/auth";
 import { badRequest, unauthorized } from "@/lib/studybuddy/http";
-import { validateUserCredentials } from "@/lib/studybuddy/store";
+import { validateUserCredentials, isProfileComplete } from "@/lib/studybuddy/store";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   return applySessionCookie(
     NextResponse.json({
       user,
-      profileCompleted: false,
+      profileCompleted: isProfileComplete(user.id),
     }),
     user.id,
   );

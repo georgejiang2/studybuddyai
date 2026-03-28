@@ -16,12 +16,21 @@ export async function GET(request: NextRequest) {
     return unauthorized();
   }
 
+  const friendships = listFriendshipsForUser(user.id).map((f) => {
+    const partnerId =
+      f.requesterId === user.id ? f.recipientId : f.requesterId;
+    return {
+      ...f,
+      partnerProfile: getProfile(partnerId),
+    };
+  });
+
   return ok({
     user,
     profile: getProfile(user.id),
     subjects: getProfileSubjects(user.id),
     profileCompleted: isProfileComplete(user.id),
     matchStatus: getUserMatchStatus(user.id),
-    friendships: listFriendshipsForUser(user.id),
+    friendships,
   });
 }

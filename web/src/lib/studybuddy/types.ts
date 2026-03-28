@@ -78,6 +78,15 @@ export interface MessageRecord {
   createdAt: string;
 }
 
+export interface SessionMessageRecord {
+  id: string;
+  sessionId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface ProfileSetupInput {
   name: string;
   school: string;

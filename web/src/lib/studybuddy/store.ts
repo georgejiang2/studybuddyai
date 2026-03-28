@@ -8,6 +8,7 @@ import {
   type ProfileSetupInput,
   type QueueEntry,
   type SessionRecord,
+  type SessionMessageRecord,
 } from "@/lib/studybuddy/types";
 
 interface StoreState {
@@ -21,6 +22,7 @@ interface StoreState {
   sessions: Map<string, SessionRecord>;
   friends: Map<string, FriendRecord>;
   messages: Map<string, MessageRecord>;
+  sessionMessages: Map<string, SessionMessageRecord>;
 }
 
 const STORE_KEY = "__studybuddy_store__";
@@ -122,6 +124,7 @@ function createSeedState(): StoreState {
     sessions: new Map(),
     friends: new Map(),
     messages: new Map(),
+    sessionMessages: new Map(),
   };
 }
 
@@ -429,4 +432,38 @@ export function getSubjectOverlap(userA: string, userB: string) {
   const subjectsA = new Set(getProfileSubjects(userA).map(normalizeSubject));
   const subjectsB = getProfileSubjects(userB).map(normalizeSubject);
   return subjectsB.filter((subject) => subjectsA.has(subject));
+}
+
+export function endSession(sessionId: string) {
+  const state = getState();
+  const session = state.sessions.get(sessionId);
+  if (!session) return null;
+  const updated: SessionRecord = { ...session, status: "ended" };
+  state.sessions.set(sessionId, updated);
+  return updated;
+}
+
+export function createSessionMessage(
+  sessionId: string,
+  senderId: string,
+  senderName: string,
+  text: string,
+) {
+  const state = getState();
+  const message: SessionMessageRecord = {
+    id: makeId("smsg"),
+    sessionId,
+    senderId,
+    senderName,
+    text: text.trim(),
+    createdAt: nowIso(),
+  };
+  state.sessionMessages.set(message.id, message);
+  return message;
+}
+
+export function listSessionMessages(sessionId: string) {
+  return Array.from(getState().sessionMessages.values())
+    .filter((m) => m.sessionId === sessionId)
+    .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
 }

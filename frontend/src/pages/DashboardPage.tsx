@@ -1,25 +1,84 @@
-import { useState, type FormEvent } from 'react';
-import { BookOpen, LogOut, Video, Loader2 } from 'lucide-react';
+import { useState, useEffect, type FormEvent } from 'react';
+import { BookOpen, LogOut, Video, Users, Home, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { api, ApiError } from '../api/client';
+import { api, ApiError, type MatchStatus, type SessionJoinPayload, type PartnerProfile } from '../api/client';
 import ThemeToggle from '../components/ThemeToggle';
+import MatchingScreen from '../components/MatchingScreen';
+import StudySession from '../components/StudySession';
+import FriendsPanel from '../components/FriendsPanel';
 import styles from './DashboardPage.module.css';
 
-type View = 'home' | 'searching';
+type View = 'home' | 'searching' | 'session' | 'friends';
 
 export default function DashboardPage() {
   const { user, meData, logout, refresh } = useAuth();
   const [view, setView] = useState<View>('home');
   const [error, setError] = useState('');
+  const [sessionPayload, setSessionPayload] = useState<SessionJoinPayload | null>(null);
+  const [partnerProfile, setPartnerProfile] = useState<PartnerProfile | null>(null);
 
   const profile = meData?.profile;
   const subjects = meData?.subjects ?? [];
   const profileDone = meData?.profileCompleted ?? false;
   const displayName = profile?.name || user?.email?.split('@')[0] || 'Student';
 
+  // Check if user already has an active session on load
+  useEffect(() => {
+    if (meData?.matchStatus?.status === 'in_session' && meData.matchStatus.sessionId) {
+      joinSession(meData.matchStatus.sessionId, meData.matchStatus.partnerProfile ?? null);
+    }
+  }, [meData?.matchStatus?.status]);
+
+  const joinSession = async (sessionId: string, partner: PartnerProfile | null) => {
+    try {
+      const payload = await api.joinSession({ sessionId });
+      setSessionPayload(payload);
+      setPartnerProfile(partner);
+      setView('session');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to join session.');
+      setView('home');
+    }
+  };
+
+  const handleMatched = async (matchStatus: MatchStatus) => {
+    if (matchStatus.sessionId) {
+      await joinSession(matchStatus.sessionId, matchStatus.partnerProfile ?? null);
+    } else if (matchStatus.matchId) {
+      try {
+        const payload = await api.joinSession({ matchId: matchStatus.matchId });
+        setSessionPayload(payload);
+        setPartnerProfile(matchStatus.partnerProfile ?? null);
+        setView('session');
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Failed to join session.');
+        setView('home');
+      }
+    }
+  };
+
+  const handleSessionEnd = () => {
+    setSessionPayload(null);
+    setPartnerProfile(null);
+    setView('home');
+    refresh();
+  };
+
   const handleLogout = async () => {
     await logout();
   };
+
+  // Full-screen session view (no nav)
+  if (view === 'session' && sessionPayload) {
+    return (
+      <StudySession
+        sessionPayload={sessionPayload}
+        partnerProfile={partnerProfile}
+        onEnd={handleSessionEnd}
+        onAddFriend={() => {}}
+      />
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -39,76 +98,105 @@ export default function DashboardPage() {
         </div>
       </nav>
 
-      <main className={styles.main}>
-        <div className={styles.content}>
-          {!profileDone ? (
-            <ProfileSetup onDone={refresh} />
-          ) : view === 'searching' ? (
-            <SearchingView
-              subjects={subjects}
-              onCancel={() => { setView('home'); setError(''); }}
-              onError={(msg) => { setError(msg); setView('home'); }}
-            />
-          ) : (
-            <>
-              <h1 className={styles.greeting}>Hey, {displayName}</h1>
-              <p className={styles.sub}>Ready to find a study partner?</p>
-
-              {error && <div className={styles.error}>{error}</div>}
-
-              <div className={styles.card}>
-                <div className={styles.cardIcon}>
-                  <Video size={24} />
-                </div>
-                <div>
-                  <h2>Start Studying</h2>
-                  <p>
-                    Pick a subject and we'll match you with a student studying the
-                    same thing right now.
-                  </p>
-                </div>
-                <button
-                  className={styles.startBtn}
-                  onClick={() => { setError(''); setView('searching'); }}
-                >
-                  Start Studying
-                </button>
-              </div>
-
-              <div className={styles.info}>
-                <div className={styles.infoItem}>
-                  <span className={styles.infoLabel}>Email</span>
-                  <span className={styles.infoValue}>{user?.email}</span>
-                </div>
-                {profile?.school && (
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>School</span>
-                    <span className={styles.infoValue}>{profile.school}</span>
-                  </div>
-                )}
-                {profile?.major && (
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>Major</span>
-                    <span className={styles.infoValue}>{profile.major}</span>
-                  </div>
-                )}
-                {profile?.year && (
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>Year</span>
-                    <span className={styles.infoValue}>{profile.year}</span>
-                  </div>
-                )}
-                {subjects.length > 0 && (
-                  <div className={styles.infoItem}>
-                    <span className={styles.infoLabel}>Subjects</span>
-                    <span className={styles.infoValue}>{subjects.join(', ')}</span>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+      {/* Tab bar */}
+      {profileDone && view !== 'searching' && (
+        <div className={styles.tabBar}>
+          <div className={styles.tabBarInner}>
+            <button
+              className={`${styles.tab} ${view === 'home' ? styles.tabActive : ''}`}
+              onClick={() => setView('home')}
+            >
+              <Home size={16} />
+              Home
+            </button>
+            <button
+              className={`${styles.tab} ${view === 'friends' ? styles.tabActive : ''}`}
+              onClick={() => setView('friends')}
+            >
+              <Users size={16} />
+              Friends
+            </button>
+          </div>
         </div>
-      </main>
+      )}
+
+      {view === 'searching' ? (
+        <MatchingScreen
+          subjects={subjects}
+          onMatched={handleMatched}
+          onCancel={() => { setView('home'); setError(''); }}
+          onError={(msg) => { setError(msg); setView('home'); }}
+        />
+      ) : view === 'friends' ? (
+        <main className={styles.friendsMain}>
+          <FriendsPanel />
+        </main>
+      ) : (
+        <main className={styles.main}>
+          <div className={styles.content}>
+            {!profileDone ? (
+              <ProfileSetup onDone={refresh} />
+            ) : (
+              <>
+                <h1 className={styles.greeting}>Hey, {displayName}</h1>
+                <p className={styles.sub}>Ready to find a study partner?</p>
+
+                {error && <div className={styles.error}>{error}</div>}
+
+                <div className={styles.card}>
+                  <div className={styles.cardIcon}>
+                    <Video size={24} />
+                  </div>
+                  <div>
+                    <h2>Start Studying</h2>
+                    <p>
+                      Pick a subject and we'll match you with a student studying the
+                      same thing right now.
+                    </p>
+                  </div>
+                  <button
+                    className={styles.startBtn}
+                    onClick={() => { setError(''); setView('searching'); }}
+                  >
+                    Start Studying
+                  </button>
+                </div>
+
+                <div className={styles.info}>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>Email</span>
+                    <span className={styles.infoValue}>{user?.email}</span>
+                  </div>
+                  {profile?.school && (
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>School</span>
+                      <span className={styles.infoValue}>{profile.school}</span>
+                    </div>
+                  )}
+                  {profile?.major && (
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>Major</span>
+                      <span className={styles.infoValue}>{profile.major}</span>
+                    </div>
+                  )}
+                  {profile?.year && (
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>Year</span>
+                      <span className={styles.infoValue}>{profile.year}</span>
+                    </div>
+                  )}
+                  {subjects.length > 0 && (
+                    <div className={styles.infoItem}>
+                      <span className={styles.infoLabel}>Subjects</span>
+                      <span className={styles.infoValue}>{subjects.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </main>
+      )}
     </div>
   );
 }
@@ -197,104 +285,6 @@ function ProfileSetup({ onDone }: { onDone: () => void }) {
           {loading ? 'Saving...' : 'Save profile'}
         </button>
       </form>
-    </div>
-  );
-}
-
-function SearchingView({
-  subjects,
-  onCancel,
-  onError,
-}: {
-  subjects: string[];
-  onCancel: () => void;
-  onError: (msg: string) => void;
-}) {
-  const [subject, setSubject] = useState(subjects[0] ?? '');
-  const [status, setStatus] = useState<'pick' | 'queued' | 'matched'>('pick');
-  const [matchReason, setMatchReason] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const startSearch = async () => {
-    if (!subject) return;
-    setLoading(true);
-    try {
-      const res = await api.startMatch(subject);
-      if (res.status === 'matched') {
-        setStatus('matched');
-        setMatchReason(res.reason ?? 'You were matched!');
-      } else {
-        setStatus('queued');
-      }
-    } catch (err) {
-      onError(err instanceof ApiError ? err.message : 'Failed to start matching.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const cancel = async () => {
-    try {
-      await api.cancelMatch();
-    } catch {
-      // ignore
-    }
-    onCancel();
-  };
-
-  if (status === 'matched') {
-    return (
-      <div className={styles.center}>
-        <h1 className={styles.greeting}>Match found!</h1>
-        <p className={styles.sub}>{matchReason}</p>
-        <button className={styles.secondaryBtn} onClick={onCancel}>
-          Back to dashboard
-        </button>
-      </div>
-    );
-  }
-
-  if (status === 'queued') {
-    return (
-      <div className={styles.center}>
-        <Loader2 size={32} className={styles.spin} />
-        <h1 className={styles.greeting}>Looking for a partner...</h1>
-        <p className={styles.sub}>
-          Studying <strong>{subject}</strong>. We'll match you as soon as someone joins.
-        </p>
-        <button className={styles.secondaryBtn} onClick={cancel}>
-          Cancel
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <h1 className={styles.greeting}>What are you studying?</h1>
-      <p className={styles.sub}>Pick a subject and we'll find you a partner.</p>
-
-      <div className={styles.subjectPicker}>
-        {subjects.map((s) => (
-          <button
-            key={s}
-            type="button"
-            className={`${styles.subjectChip} ${s === subject ? styles.subjectActive : ''}`}
-            onClick={() => setSubject(s)}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.searchActions}>
-        <button className={styles.startBtn} onClick={startSearch} disabled={loading || !subject}>
-          {loading ? 'Joining...' : 'Find a partner'}
-        </button>
-        <button className={styles.secondaryBtn} onClick={onCancel}>
-          Back
-        </button>
-      </div>
     </div>
   );
 }

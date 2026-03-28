@@ -33,13 +33,23 @@ export interface Profile {
   bio: string;
 }
 
+export interface PartnerProfile {
+  userId: string;
+  name: string;
+  school: string;
+  major: string;
+  year: string;
+  bio: string;
+  subjects: string[];
+}
+
 export interface MeResponse {
   user: AuthUser;
   profile: Profile | null;
   subjects: string[] | null;
   profileCompleted: boolean;
-  matchStatus: unknown;
-  friendships: unknown[];
+  matchStatus: MatchStatus;
+  friendships: Friendship[];
 }
 
 interface AuthResponse {
@@ -57,11 +67,51 @@ export interface ProfileSetupPayload {
 }
 
 export interface MatchStatus {
-  status: 'idle' | 'queued' | 'matched';
+  status: 'idle' | 'waiting' | 'matched' | 'in_session';
   matchId: string | null;
+  matchType: string | null;
   reason: string | null;
-  sessionId: string | null;
+  partnerProfile: PartnerProfile | null;
+  queuedAt: string | null;
   currentSubject: string | null;
+  sessionId: string | null;
+}
+
+export interface SessionJoinPayload {
+  sessionId: string;
+  roomName: string;
+  token: string;
+  livekitUrl: string;
+  partnerId: string;
+  matchReason: string;
+}
+
+export interface SessionMessage {
+  id: string;
+  sessionId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface Friendship {
+  id: string;
+  requesterId: string;
+  recipientId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+  partnerProfile?: Profile | null;
+}
+
+export interface FriendMessage {
+  id: string;
+  friendshipId: string;
+  senderId: string;
+  recipientId: string;
+  text: string;
+  createdAt: string;
 }
 
 export const api = {
@@ -96,6 +146,7 @@ export const api = {
     );
   },
 
+  // Matching
   startMatch(currentSubject: string) {
     return request<MatchStatus>('/api/match/start', {
       method: 'POST',
@@ -110,6 +161,63 @@ export const api = {
   cancelMatch() {
     return request<{ status: string }>('/api/match/cancel', {
       method: 'POST',
+    });
+  },
+
+  // Sessions
+  joinSession(params: { sessionId?: string; matchId?: string }) {
+    return request<SessionJoinPayload>('/api/session/create-or-join', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  endSession(sessionId: string) {
+    return request<{ session: unknown }>('/api/session/end', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    });
+  },
+
+  getSessionMessages(sessionId: string) {
+    return request<{ messages: SessionMessage[] }>(`/api/session/messages?sessionId=${sessionId}`);
+  },
+
+  sendSessionMessage(sessionId: string, text: string) {
+    return request<{ message: SessionMessage }>('/api/session/messages', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, text }),
+    });
+  },
+
+  // Friends
+  getFriends() {
+    return request<{ friendships: Friendship[] }>('/api/friends');
+  },
+
+  sendFriendRequest(recipientId: string) {
+    return request<{ friendship: Friendship }>('/api/friends/request', {
+      method: 'POST',
+      body: JSON.stringify({ recipientId }),
+    });
+  },
+
+  respondFriendRequest(friendshipId: string, action: 'accept' | 'reject') {
+    return request<{ friendship: Friendship }>('/api/friends/respond', {
+      method: 'POST',
+      body: JSON.stringify({ friendshipId, action }),
+    });
+  },
+
+  // Friend Chat
+  getFriendChat(friendId: string) {
+    return request<{ friendship: Friendship; messages: FriendMessage[] }>(`/api/chat/${friendId}`);
+  },
+
+  sendFriendMessage(friendId: string, text: string) {
+    return request<{ message: FriendMessage }>(`/api/chat/${friendId}`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
     });
   },
 };
