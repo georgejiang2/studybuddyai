@@ -220,6 +220,15 @@ function ProfileSetup({ onDone, existingProfile, existingSubjects }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Update fields when profile data arrives after signup
+  useEffect(() => {
+    if (existingProfile?.name && !name) setName(existingProfile.name);
+    if (existingProfile?.school && !school) setSchool(existingProfile.school);
+    if (existingProfile?.major && !major) setMajor(existingProfile.major);
+    if (existingProfile?.year && !year) setYear(existingProfile.year);
+    if (existingProfile?.bio && !bio) setBio(existingProfile.bio);
+  }, [existingProfile]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
