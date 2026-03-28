@@ -225,33 +225,24 @@ export function findOrCreateMatch(userId: string): MatchStatusResponse {
 
 export function getUserMatchStatus(userId: string): MatchStatusResponse {
   const activeSession = getActiveSessionForUser(userId);
-  const recentMatch = listMatchesForUser(userId)[0] ?? null;
   const queueEntry = getQueueEntry(userId);
 
-  if (activeSession && recentMatch) {
-    return {
-      status: "in_session",
-      matchId: recentMatch.id,
-      matchType: recentMatch.matchType,
-      reason: recentMatch.reason,
-      partnerProfile: buildPartnerProfile(getPartnerUserId(recentMatch, userId)),
-      queuedAt: null,
-      currentSubject: null,
-      sessionId: activeSession.id,
-    };
-  }
-
-  if (recentMatch) {
-    return {
-      status: "matched",
-      matchId: recentMatch.id,
-      matchType: recentMatch.matchType,
-      reason: recentMatch.reason,
-      partnerProfile: buildPartnerProfile(getPartnerUserId(recentMatch, userId)),
-      queuedAt: null,
-      currentSubject: null,
-      sessionId: null,
-    };
+  if (activeSession) {
+    const match = listMatchesForUser(userId).find(
+      (m) => m.id === activeSession.matchId,
+    );
+    if (match) {
+      return {
+        status: "in_session",
+        matchId: match.id,
+        matchType: match.matchType,
+        reason: match.reason,
+        partnerProfile: buildPartnerProfile(getPartnerUserId(match, userId)),
+        queuedAt: null,
+        currentSubject: null,
+        sessionId: activeSession.id,
+      };
+    }
   }
 
   if (queueEntry) {
