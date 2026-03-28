@@ -9,7 +9,7 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--nav-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
@@ -177,7 +177,7 @@
 
 .btnSecondary:hover {
   background: var(--bg);
-  border-color: #d4d4d8;
+  border-color: var(--secondary-hover-border);
 }
 
 /* ── Sections shared ── */
@@ -259,7 +259,7 @@
 }
 
 .featureCard:hover {
-  border-color: #c4c4cc;
+  border-color: var(--card-hover-border);
 }
 
 .featureCard h3 {

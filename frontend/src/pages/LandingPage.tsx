@@ -1,4 +1,5 @@
 import { Video, Users, Zap, MessageCircle, ArrowRight, ChevronDown, BookOpen } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 import styles from './LandingPage.module.css';
 
 interface Props {
@@ -40,6 +41,7 @@ export default function LandingPage({ onLogin, onSignup }: Props) {
             <span>StudyBuddy</span>
           </a>
           <div className={styles.navRight}>
+            <ThemeToggle />
             <button onClick={onLogin} className={styles.navLink}>
               Log in
             </button>

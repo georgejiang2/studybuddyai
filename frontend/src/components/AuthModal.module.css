@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--overlay);
   animation: fadeIn 0.15s ease-out;
 }
 
@@ -159,7 +159,7 @@
 
 .field input:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.06);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .labelRow {

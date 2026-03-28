@@ -22,6 +22,32 @@
   --radius: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --nav-bg: rgba(255, 255, 255, 0.85);
+  --focus-ring: rgba(24, 24, 27, 0.06);
+  --overlay: rgba(0, 0, 0, 0.45);
+  --card-hover-border: #c4c4cc;
+  --secondary-hover-border: #d4d4d8;
+}
+
+[data-theme="dark"] {
+  --white: #0e0e10;
+  --bg: #1a1a1e;
+  --bg-warm: #17171b;
+  --bg-dark: #0a0a0c;
+  --border: #27272d;
+  --border-focus: #d0d0d6;
+  --text: #f0f0f2;
+  --text-secondary: #a0a0ad;
+  --text-muted: #65656f;
+  --accent: #f0f0f2;
+  --accent-hover: #d4d4da;
+  --accent-inv: #111113;
+  --nav-bg: rgba(14, 14, 16, 0.88);
+  --focus-ring: rgba(240, 240, 242, 0.08);
+  --overlay: rgba(0, 0, 0, 0.65);
+  --card-hover-border: #38383f;
+  --secondary-hover-border: #333339;
+  color-scheme: dark;
 }
 
 html {
@@ -29,6 +55,7 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
+  color-scheme: light;
 }
 
 body {
