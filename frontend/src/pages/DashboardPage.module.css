@@ -126,8 +126,31 @@
 }
 
 .content {
-  max-width: 600px;
+  max-width: 900px;
   margin: 0 auto;
+}
+
+.homeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.homeLeft {
+  display: flex;
+  flex-direction: column;
+}
+
+.homeRight {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 768px) {
+  .homeGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .greeting {
@@ -169,7 +192,6 @@
   padding: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  margin-bottom: 32px;
 }
 
 .card h2 {

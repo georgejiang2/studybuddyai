@@ -173,31 +173,37 @@ export default function DashboardPage() {
 
                 {error && <div className={styles.error}>{error}</div>}
 
-                <div className={styles.card}>
-                  <div className={styles.cardIcon}>
-                    <Video size={24} />
+                <div className={styles.homeGrid}>
+                  <div className={styles.homeLeft}>
+                    <div className={styles.card}>
+                      <div className={styles.cardIcon}>
+                        <Video size={24} />
+                      </div>
+                      <div>
+                        <h2>Start Studying</h2>
+                        <p>
+                          Pick a subject and we'll match you with a student studying the
+                          same thing right now.
+                        </p>
+                      </div>
+                      <button
+                        className={styles.startBtn}
+                        onClick={() => { setError(''); setView('searching'); }}
+                      >
+                        Start Studying
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <h2>Start Studying</h2>
-                    <p>
-                      Pick a subject and we'll match you with a student studying the
-                      same thing right now.
-                    </p>
-                  </div>
-                  <button
-                    className={styles.startBtn}
-                    onClick={() => { setError(''); setView('searching'); }}
-                  >
-                    Start Studying
-                  </button>
-                </div>
 
-                <ProfileEditor
-                  profile={profile}
-                  email={user?.email ?? ''}
-                  subjects={subjects}
-                  onSaved={refresh}
-                />
+                  <div className={styles.homeRight}>
+                    <ProfileEditor
+                      profile={profile}
+                      email={user?.email ?? ''}
+                      subjects={subjects}
+                      onSaved={refresh}
+                    />
+                  </div>
+                </div>
               </>
             )}
           </div>
