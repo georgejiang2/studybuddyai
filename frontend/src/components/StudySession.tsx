@@ -60,6 +60,41 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
   const unreadCountRef = useRef(0);
   const latestMessageAtRef = useRef<string | null>(null);
   const lastSeenMessageAtRef = useRef<string | null>(null);
+  const chatOpenRef = useRef(chatOpen);
+  const bgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Keep ref in sync
+  useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
+
+  // Background poll for messages even when chat panel is closed
+  useEffect(() => {
+    const poll = async () => {
+      if (chatOpenRef.current) return; // ChatPanel polls when open
+      try {
+        const res = await api.getSessionMessages(sessionPayload.sessionId);
+        const messages = res.messages;
+        const latestAt = messages.length > 0 ? messages[messages.length - 1].createdAt : null;
+        latestMessageAtRef.current = latestAt;
+
+        const unreadIncoming = messages.filter(
+          (m) =>
+            m.senderId === sessionPayload.partnerId &&
+            (!lastSeenMessageAtRef.current || m.createdAt > lastSeenMessageAtRef.current),
+        ).length;
+
+        if (unreadIncoming > unreadCountRef.current) {
+          playPing();
+        }
+        unreadCountRef.current = unreadIncoming;
+        setUnreadCount(unreadIncoming);
+      } catch {
+        // ignore
+      }
+    };
+    poll(); // initial check
+    bgPollRef.current = setInterval(poll, 3000);
+    return () => { if (bgPollRef.current) clearInterval(bgPollRef.current); };
+  }, [sessionPayload.sessionId, sessionPayload.partnerId]);
 
   const handleAddFriend = async () => {
     if (friendAdded) return;
