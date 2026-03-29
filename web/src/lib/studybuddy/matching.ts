@@ -186,15 +186,13 @@ function computeMatchScore(
   // Jaccard on all subject word tokens
   const subjectsScore = jaccard(subjectTokens(userId), subjectTokens(candidateId));
 
-  // Fuzzy Jaccard on normalized school names
-  const schoolA = tokenize(profileA.normalizedSchool || profileA.school);
-  const schoolB = tokenize(profileB.normalizedSchool || profileB.school);
-  const schoolScore = fuzzyJaccard(schoolA, schoolB);
+  // Exact match on standardized school (from dropdown)
+  const schoolScore =
+    normalizeString(profileA.school) === normalizeString(profileB.school) ? 1.0 : 0.0;
 
-  // Fuzzy Jaccard on normalized major names
-  const majorA = tokenize(profileA.normalizedMajor || profileA.major);
-  const majorB = tokenize(profileB.normalizedMajor || profileB.major);
-  const majorScore = fuzzyJaccard(majorA, majorB);
+  // Exact match on standardized major (from dropdown)
+  const majorScore =
+    normalizeString(profileA.major) === normalizeString(profileB.major) ? 1.0 : 0.0;
 
   const yearScore = yearSimilarity(profileA.year, profileB.year);
 
@@ -242,13 +240,13 @@ function buildMatchReason(
   }
 
   if (score.breakdown.school >= 0.5) {
-    parts.push(`you both attend ${partner.normalizedSchool || partner.school}`);
+    parts.push(`you both attend ${partner.school}`);
   }
 
   if (score.breakdown.major >= 0.5 && !parts.some((p) => p.includes("studying"))) {
-    parts.push(`you share a similar major (${partner.normalizedMajor || partner.major})`);
+    parts.push(`you're both ${partner.major} majors`);
   } else if (score.breakdown.major >= 0.5) {
-    parts.push(`share a similar major`);
+    parts.push(`same major`);
   }
 
   if (score.breakdown.subjects > 0.1 && score.breakdown.currentSubject < 1) {

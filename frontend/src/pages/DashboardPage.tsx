@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
 import { BookOpen, LogOut, Video, Users, Home, Loader2, Pencil, X, Plus, Trash2 } from 'lucide-react';
+import Autocomplete from '../components/Autocomplete';
+import schools from '../data/schools.json';
+import majors from '../data/majors.json';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError, type MatchStatus, type SessionJoinPayload, type PartnerProfile } from '../api/client';
 import ThemeToggle from '../components/ThemeToggle';
@@ -271,13 +274,13 @@ function ProfileSetup({ onDone, existingProfile, existingSubjects }: {
           </div>
           <div className={styles.field}>
             <label htmlFor="p-school">School</label>
-            <input id="p-school" type="text" value={school} onChange={(e) => setSchool(e.target.value)} required placeholder="Georgia Tech" />
+            <Autocomplete id="p-school" options={schools} value={school} onChange={setSchool} placeholder="Search your school..." required />
           </div>
         </div>
         <div className={styles.row}>
           <div className={styles.field}>
             <label htmlFor="p-major">Major</label>
-            <input id="p-major" type="text" value={major} onChange={(e) => setMajor(e.target.value)} required placeholder="Computer Science" />
+            <Autocomplete id="p-major" options={majors} value={major} onChange={setMajor} placeholder="Search your major..." required />
           </div>
           <div className={styles.field}>
             <label htmlFor="p-year">Year</label>
@@ -389,11 +392,11 @@ function ProfileEditor({
         <div className={styles.editFields}>
           <div className={styles.editField}>
             <label>School</label>
-            <input value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Georgia Tech" />
+            <Autocomplete options={schools} value={school} onChange={setSchool} placeholder="Search your school..." />
           </div>
           <div className={styles.editField}>
             <label>Major</label>
-            <input value={major} onChange={(e) => setMajor(e.target.value)} placeholder="Computer Science" />
+            <Autocomplete options={majors} value={major} onChange={setMajor} placeholder="Search your major..." />
           </div>
           <div className={styles.editField}>
             <label>Year</label>

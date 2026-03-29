@@ -2,6 +2,8 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ApiError } from '../api/client';
+import Autocomplete from './Autocomplete';
+import schools from '../data/schools.json';
 import styles from './AuthModal.module.css';
 
 interface AuthModalProps {
@@ -105,12 +107,12 @@ export default function AuthModal({ open, mode, onModeChange, onClose }: AuthMod
               </div>
               <div className={styles.field}>
                 <label htmlFor="auth-school">School</label>
-                <input
+                <Autocomplete
                   id="auth-school"
-                  type="text"
-                  placeholder="Georgia Tech"
+                  options={schools}
                   value={school}
-                  onChange={(e) => setSchool(e.target.value)}
+                  onChange={setSchool}
+                  placeholder="Search your school..."
                   required
                 />
               </div>
