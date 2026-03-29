@@ -13,11 +13,6 @@ import styles from './DashboardPage.module.css';
 
 type View = 'home' | 'searching' | 'session' | 'friends' | 'profile';
 
-const ALL_STUDY_STYLES = [
-  'focused', 'collaborative', 'social', 'competitive',
-  'casual', 'teaching', 'visual', 'cramming',
-] as const;
-
 export default function DashboardPage() {
   const { user, meData, logout, refresh } = useAuth();
   const [view, setView] = useState<View>('home');
@@ -548,7 +543,6 @@ function ProfilePage({
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [editSubjects, setEditSubjects] = useState<string[]>(subjects);
   const [newSubject, setNewSubject] = useState('');
-  const [selectedStyles, setSelectedStyles] = useState<string[]>(studyStyles);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -563,14 +557,6 @@ function ProfilePage({
 
   const removeSubject = (index: number) => {
     setEditSubjects(editSubjects.filter((_, i) => i !== index));
-  };
-
-  const toggleStyle = (style: string) => {
-    if (selectedStyles.includes(style)) {
-      setSelectedStyles(selectedStyles.filter((s) => s !== style));
-    } else if (selectedStyles.length < 3) {
-      setSelectedStyles([...selectedStyles, style]);
-    }
   };
 
   const handleSave = async () => {
@@ -593,7 +579,6 @@ function ProfilePage({
         year,
         bio,
         subjects: editSubjects,
-        studyStyles: selectedStyles,
       });
       await onSaved();
       setSuccess(true);
@@ -678,23 +663,22 @@ function ProfilePage({
         <div className={styles.profileSection}>
           <h3 className={styles.sectionLabel}>Study Style</h3>
           <p className={styles.sectionHint}>
-            Pick up to 3 styles that describe how you like to study. This helps us match you with compatible partners.
-            {selectedStyles.length > 0 ? '' : ' Your style is also auto-detected from your bio.'}
+            Your study style is automatically detected from your bio using AI. Update your bio to change it.
           </p>
-          <div className={styles.styleGrid}>
-            {ALL_STUDY_STYLES.map((style) => (
-              <button
-                key={style}
-                type="button"
-                className={`${styles.styleOption} ${selectedStyles.includes(style) ? styles.styleSelected : ''}`}
-                onClick={() => toggleStyle(style)}
-              >
-                <span className={styles.styleEmoji}>{styleEmoji(style)}</span>
-                <span className={styles.styleName}>{style.charAt(0).toUpperCase() + style.slice(1)}</span>
-                <span className={styles.styleDesc}>{styleDescription(style)}</span>
-              </button>
-            ))}
-          </div>
+          {studyStyles.length > 0 && (
+            <div className={styles.subjectChips}>
+              {studyStyles.map((s) => (
+                <span key={s} className={styles.styleChip}>
+                  {styleEmoji(s)} {s.charAt(0).toUpperCase() + s.slice(1)}
+                </span>
+              ))}
+            </div>
+          )}
+          {studyStyles.length === 0 && (
+            <p className={styles.sectionHint} style={{ fontStyle: 'italic', marginBottom: 0 }}>
+              No study styles detected yet. Add a bio and save to generate them.
+            </p>
+          )}
         </div>
       </div>
 
@@ -721,16 +705,3 @@ function styleEmoji(style: string): string {
   return map[style] ?? '';
 }
 
-function styleDescription(style: string): string {
-  const map: Record<string, string> = {
-    focused: 'Deep work, minimal distractions',
-    collaborative: 'Shared notes, teamwork',
-    social: 'Discussion-based learning',
-    competitive: 'Exam prep, accountability',
-    casual: 'Relaxed pace, low pressure',
-    teaching: 'Explaining concepts, mentoring',
-    visual: 'Diagrams, whiteboards',
-    cramming: 'Last-minute, high intensity',
-  };
-  return map[style] ?? '';
-}
