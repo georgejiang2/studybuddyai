@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
-import { BookOpen, LogOut, Video, Users, Home, Loader2, Pencil, X, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, LogOut, Video, Users, Home, Pencil, X, Plus, Trash2 } from 'lucide-react';
 import Autocomplete from '../components/Autocomplete';
 import schools from '../data/schools.json';
 import majors from '../data/majors.json';

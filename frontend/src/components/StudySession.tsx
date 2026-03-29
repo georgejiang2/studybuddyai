@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
 import {
   LiveKitRoom,
+  RoomAudioRenderer,
   VideoTrack,
   useTracks,
   useRoomContext,
@@ -8,6 +9,7 @@ import {
   useConnectionState,
 } from '@livekit/components-react';
 import { Track, ConnectionState } from 'livekit-client';
+import type { RemoteAudioTrack } from 'livekit-client';
 import {
   Mic,
   MicOff,
@@ -100,6 +102,7 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
       className={styles.room}
       onDisconnected={handleEndSession}
     >
+      <RoomAudioRenderer />
       <SessionContent
         sessionPayload={sessionPayload}
         partnerProfile={partnerProfile}
@@ -318,8 +321,8 @@ function SessionContent({
     const remoteParticipants = participants.filter((p) => !p.isLocal);
     for (const rp of remoteParticipants) {
       for (const pub of rp.audioTrackPublications.values()) {
-        if (pub.track) {
-          pub.track.setVolume(next ? 0 : 1);
+        if (pub.track && 'setVolume' in pub.track) {
+          (pub.track as RemoteAudioTrack).setVolume(next ? 0 : 1);
         }
       }
     }
