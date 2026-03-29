@@ -476,12 +476,15 @@ function ProfileEditor({
         </div>
       )}
       {subjects.length > 0 && (
-        <div className={styles.infoItem}>
+        <div className={styles.infoItemCol}>
           <span className={styles.infoLabel}>Subjects</span>
           <div className={styles.subjectChips}>
-            {subjects.map((s) => (
+            {subjects.slice(0, 3).map((s) => (
               <span key={s} className={styles.subjectChip}>{s}</span>
             ))}
+            {subjects.length > 3 && (
+              <span className={styles.subjectMore}>+{subjects.length - 3}</span>
+            )}
           </div>
         </div>
       )}

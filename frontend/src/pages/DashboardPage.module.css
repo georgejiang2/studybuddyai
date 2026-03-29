@@ -471,19 +471,44 @@
   border-top: 1px solid var(--border);
 }
 
+.infoItemCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.infoItemCol:last-child {
+  border-bottom: none;
+}
+
 .subjectChips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
 }
 
 .subjectChip {
-  padding: 3px 10px;
-  font-size: 0.75rem;
+  padding: 4px 12px;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: var(--text-secondary);
   background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 100px;
+  white-space: nowrap;
+}
+
+.subjectMore {
+  padding: 4px 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 100px;
+  white-space: nowrap;
 }
 
 .infoItem {
