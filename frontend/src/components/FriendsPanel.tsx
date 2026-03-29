@@ -84,6 +84,13 @@ export default function FriendsPanel() {
     writeLastReadMap(user.id, next);
   }, [user]);
 
+  const handleBack = useCallback(() => setSelectedFriend(null), []);
+  const handleMessagesSeen = useCallback((latestMessageAt?: string) => {
+    if (selectedFriend) {
+      markConversationRead(selectedFriend.id, latestMessageAt);
+    }
+  }, [selectedFriend, markConversationRead]);
+
   if (selectedFriend && user) {
     const partnerId = getPartnerId(selectedFriend, user.id);
     const partnerName = selectedFriend.partnerProfile?.name ?? 'Friend';
@@ -92,10 +99,8 @@ export default function FriendsPanel() {
         friendshipId={selectedFriend.id}
         friendId={partnerId}
         friendName={partnerName}
-        onBack={() => setSelectedFriend(null)}
-        onMessagesSeen={(latestMessageAt) => {
-          markConversationRead(selectedFriend.id, latestMessageAt);
-        }}
+        onBack={handleBack}
+        onMessagesSeen={handleMessagesSeen}
       />
     );
   }
@@ -277,16 +282,19 @@ function FriendChat({
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onMessagesSeenRef = useRef(onMessagesSeen);
+  onMessagesSeenRef.current = onMessagesSeen;
 
   const fetchMessages = useCallback(async () => {
     try {
       const res = await api.getFriendChat(friendId);
       setMessages(res.messages);
-      onMessagesSeen(res.messages.length > 0 ? res.messages[res.messages.length - 1].createdAt : undefined);
+      const latest = res.messages.length > 0 ? res.messages[res.messages.length - 1].createdAt : undefined;
+      onMessagesSeenRef.current(latest);
     } catch {
       // ignore
     }
-  }, [friendId, onMessagesSeen]);
+  }, [friendId]);
 
   useEffect(() => {
     fetchMessages();
@@ -299,11 +307,6 @@ function FriendChat({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  useEffect(() => {
-    if (messages.length === 0) return;
-    onMessagesSeen(messages[messages.length - 1].createdAt);
-  }, [messages, onMessagesSeen, friendshipId]);
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
