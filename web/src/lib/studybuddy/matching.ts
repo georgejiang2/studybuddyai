@@ -6,6 +6,7 @@ import {
   getProfile,
   getProfileSubjects,
   getQueueEntry,
+  getRecentlySkipped,
   isProfileComplete,
   listMatchesForUser,
   listQueueEntries,
@@ -315,10 +316,14 @@ export async function findOrCreateMatch(userId: string): Promise<MatchStatusResp
   const waitedMs = Date.now() - new Date(queueEntry.queuedAt).getTime();
   const strictSubjectWindow = waitedMs < SUBJECT_STRICT_WINDOW_MS;
 
+  // Get recently skipped users to avoid immediate re-matching
+  const recentlySkipped = await getRecentlySkipped(userId, 5);
+
   const allEntries = await listQueueEntries();
   const candidates: typeof allEntries = [];
   for (const c of allEntries) {
     if (c.userId === userId) continue;
+    if (recentlySkipped.has(c.userId)) continue; // Skip cooldown
     if (!(await isProfileComplete(c.userId)) || await getActiveSessionForUser(c.userId)) continue;
     if (strictSubjectWindow) {
       if (c.normalizedCurrentSubject === queueEntry.normalizedCurrentSubject) {

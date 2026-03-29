@@ -115,6 +115,13 @@ export default function DashboardPage() {
     refresh();
   };
 
+  const handleSkip = () => {
+    setSessionPayload(null);
+    setPartnerProfile(null);
+    setView('searching');
+    refresh();
+  };
+
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
     try {
@@ -179,6 +186,7 @@ export default function DashboardPage() {
         sessionPayload={sessionPayload}
         partnerProfile={partnerProfile}
         onEnd={handleSessionEnd}
+        onSkip={handleSkip}
         onAddFriend={() => {}}
       />
     );

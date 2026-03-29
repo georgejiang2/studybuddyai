@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
-import { MessageCircle, Clock, Send, ArrowLeft, Users, Phone, PhoneOff, Loader2 } from 'lucide-react';
+import { MessageCircle, Clock, Send, ArrowLeft, Users, Phone, PhoneOff, Loader2, UserMinus } from 'lucide-react';
 import { api, type Friendship, type FriendMessage, type CallRecord, type SessionJoinPayload, type PartnerProfile } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import styles from './FriendsPanel.module.css';
@@ -135,6 +135,18 @@ export default function FriendsPanel({ onCallAccepted }: FriendsPanelProps) {
     setActiveCall(null);
   };
 
+  const handleUnfriend = async (friendshipId: string) => {
+    try {
+      await api.removeFriend(friendshipId);
+      await fetchFriends();
+      if (selectedFriend?.id === friendshipId) {
+        setSelectedFriend(null);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // Cleanup call poll on unmount
   useEffect(() => {
     return () => { if (callPollRef.current) clearInterval(callPollRef.current); };
@@ -172,6 +184,8 @@ export default function FriendsPanel({ onCallAccepted }: FriendsPanelProps) {
         friendName={partnerName}
         onBack={() => setSelectedFriend(null)}
         onMarkRead={markRead}
+        onStartCall={() => handleStartCall(selectedFriend)}
+        onUnfriend={() => handleUnfriend(selectedFriend.id)}
       />
     );
   }
@@ -303,12 +317,16 @@ function FriendChat({
   friendName,
   onBack,
   onMarkRead,
+  onStartCall,
+  onUnfriend,
 }: {
   friendshipId: string;
   friendId: string;
   friendName: string;
   onBack: () => void;
   onMarkRead: (friendshipId: string, latestAt?: string) => void;
+  onStartCall: () => void;
+  onUnfriend: () => void;
 }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<FriendMessage[]>([]);
@@ -369,6 +387,22 @@ function FriendChat({
           {friendName.charAt(0).toUpperCase()}
         </div>
         <span className={styles.chatName}>{friendName}</span>
+        <div className={styles.chatHeaderActions}>
+          <button
+            className={styles.callFriendBtn}
+            onClick={onStartCall}
+            title="Call"
+          >
+            <Phone size={14} />
+          </button>
+          <button
+            className={styles.unfriendBtn}
+            onClick={onUnfriend}
+            title="Unfriend"
+          >
+            <UserMinus size={14} />
+          </button>
+        </div>
       </div>
       <div className={styles.chatMessages}>
         {messages.length === 0 && (

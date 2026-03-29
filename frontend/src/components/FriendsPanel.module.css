@@ -319,6 +319,32 @@
 .chatName {
   font-size: 0.9375rem;
   font-weight: 600;
+  flex: 1;
+}
+
+.chatHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.unfriendBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #dc2626;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.unfriendBtn:hover {
+  background: #b91c1c;
 }
 
 .chatMessages {

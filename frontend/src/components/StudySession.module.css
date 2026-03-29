@@ -171,6 +171,15 @@
   background: #15803d;
 }
 
+.skipBtn {
+  background: #2563eb;
+  color: #fff;
+}
+
+.skipBtn:hover {
+  background: #1d4ed8;
+}
+
 .endBtn {
   background: #dc2626;
   color: #fff;

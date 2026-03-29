@@ -195,6 +195,13 @@ export const api = {
     });
   },
 
+  skipSession(sessionId: string) {
+    return request<{ session: unknown }>('/api/session/skip', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    });
+  },
+
   getSessionMessages(sessionId: string) {
     return request<{ messages: SessionMessage[] }>(`/api/session/messages?sessionId=${sessionId}`);
   },
@@ -260,6 +267,13 @@ export const api = {
     return request<{ call: CallRecord }>('/api/friends/call/cancel', {
       method: 'POST',
       body: JSON.stringify({ callId }),
+    });
+  },
+
+  removeFriend(friendshipId: string) {
+    return request<{ success: boolean }>('/api/friends/remove', {
+      method: 'POST',
+      body: JSON.stringify({ friendshipId }),
     });
   },
 

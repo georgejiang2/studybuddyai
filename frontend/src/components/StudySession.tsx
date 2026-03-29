@@ -22,6 +22,7 @@ import {
   Volume2,
   Send,
   UserPlus,
+  SkipForward,
   X,
 } from 'lucide-react';
 import { api, type SessionMessage, type SessionJoinPayload, type PartnerProfile } from '../api/client';
@@ -50,10 +51,11 @@ interface Props {
   sessionPayload: SessionJoinPayload;
   partnerProfile: PartnerProfile | null;
   onEnd: () => void;
+  onSkip: () => void;
   onAddFriend: (partnerId: string) => void;
 }
 
-export default function StudySession({ sessionPayload, partnerProfile, onEnd, onAddFriend }: Props) {
+export default function StudySession({ sessionPayload, partnerProfile, onEnd, onSkip, onAddFriend }: Props) {
   const [chatOpen, setChatOpen] = useState(false);
   const [friendAdded, setFriendAdded] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -116,6 +118,15 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
     onEnd();
   };
 
+  const handleSkip = async () => {
+    try {
+      await api.skipSession(sessionPayload.sessionId);
+    } catch {
+      // ignore
+    }
+    onSkip();
+  };
+
   const handleNewMessages = useCallback((messages: SessionMessage[]) => {
     const latestMessageAt = messages.length > 0 ? messages[messages.length - 1].createdAt : null;
     latestMessageAtRef.current = latestMessageAt;
@@ -166,6 +177,7 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
         friendAdded={friendAdded}
         onAddFriend={handleAddFriend}
         onEnd={handleEndSession}
+        onSkip={handleSkip}
       />
     );
   }
@@ -191,6 +203,7 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
         friendAdded={friendAdded}
         onAddFriend={handleAddFriend}
         onEnd={handleEndSession}
+        onSkip={handleSkip}
       />
     </LiveKitRoom>
   );
@@ -206,6 +219,7 @@ function FallbackSession({
   friendAdded,
   onAddFriend,
   onEnd,
+  onSkip,
 }: {
   sessionPayload: SessionJoinPayload;
   partnerProfile: PartnerProfile | null;
@@ -216,6 +230,7 @@ function FallbackSession({
   friendAdded: boolean;
   onAddFriend: () => void;
   onEnd: () => void;
+  onSkip: () => void;
 }) {
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
@@ -302,6 +317,7 @@ function FallbackSession({
           onTogglePartnerMute={() => setPartnerMuted(!partnerMuted)}
           onChatToggle={onChatToggle}
           onAddFriend={onAddFriend}
+          onSkip={onSkip}
           onEnd={onEnd}
         />
       </div>
@@ -327,6 +343,7 @@ function SessionContent({
   friendAdded,
   onAddFriend,
   onEnd,
+  onSkip,
 }: {
   sessionPayload: SessionJoinPayload;
   partnerProfile: PartnerProfile | null;
@@ -337,6 +354,7 @@ function SessionContent({
   friendAdded: boolean;
   onAddFriend: () => void;
   onEnd: () => void;
+  onSkip: () => void;
 }) {
   const room = useRoomContext();
   const { canPlayAudio, startAudio } = useAudioPlayback(room);
@@ -478,6 +496,7 @@ function SessionContent({
           onTogglePartnerMute={togglePartnerMute}
           onChatToggle={onChatToggle}
           onAddFriend={onAddFriend}
+          onSkip={onSkip}
           onEnd={onEnd}
         />
       </div>
@@ -505,6 +524,7 @@ function ControlBar({
   onTogglePartnerMute,
   onChatToggle,
   onAddFriend,
+  onSkip,
   onEnd,
 }: {
   micOn: boolean;
@@ -518,6 +538,7 @@ function ControlBar({
   onTogglePartnerMute: () => void;
   onChatToggle: () => void;
   onAddFriend: () => void;
+  onSkip: () => void;
   onEnd: () => void;
 }) {
   return (
@@ -560,6 +581,13 @@ function ControlBar({
         disabled={friendAdded}
       >
         <UserPlus size={20} />
+      </button>
+      <button
+        className={`${styles.controlBtn} ${styles.skipBtn}`}
+        onClick={onSkip}
+        title="Skip to next partner"
+      >
+        <SkipForward size={20} />
       </button>
       <button
         className={`${styles.controlBtn} ${styles.endBtn}`}

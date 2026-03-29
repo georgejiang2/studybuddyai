@@ -360,6 +360,12 @@ export async function listFriendshipsForUser(userId: string): Promise<FriendReco
   }));
 }
 
+export async function deleteFriendship(friendshipId: string): Promise<void> {
+  // Delete messages associated with this friendship first
+  await query("DELETE FROM messages WHERE friendship_id = $1", [friendshipId]);
+  await query("DELETE FROM friends WHERE id = $1", [friendshipId]);
+}
+
 // ── Messages ───────────────────────────────────────────
 
 export async function createMessage(
@@ -488,6 +494,24 @@ export async function updateCallStatus(callId: string, status: CallStatus): Prom
 
 export async function expireStaleRingingCalls(): Promise<void> {
   await query("UPDATE calls SET status = 'cancelled' WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '60 seconds'");
+}
+
+// ── Skips ──────────────────────────────────────────────
+
+export async function recordSkip(skipperId: string, skippedId: string): Promise<void> {
+  await query(
+    "INSERT INTO skips (skipper_id, skipped_id, created_at) VALUES ($1, $2, NOW())",
+    [skipperId, skippedId],
+  );
+}
+
+export async function getRecentlySkipped(userId: string, withinMinutes = 5): Promise<Set<string>> {
+  const res = await query<{ skipped_id: string }>(
+    `SELECT DISTINCT skipped_id FROM skips
+     WHERE skipper_id = $1 AND created_at > NOW() - INTERVAL '${withinMinutes} minutes'`,
+    [userId],
+  );
+  return new Set(res.rows.map((r) => r.skipped_id));
 }
 
 export async function endCallBySessionId(sessionId: string): Promise<void> {
