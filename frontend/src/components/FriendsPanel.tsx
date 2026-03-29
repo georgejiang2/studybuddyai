@@ -4,27 +4,6 @@ import { api, type Friendship, type FriendMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import styles from './FriendsPanel.module.css';
 
-function getUnreadStorageKey(userId: string) {
-  return `studybuddy.friend-last-read.${userId}`;
-}
-
-function readLastReadMap(userId: string): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(getUnreadStorageKey(userId));
-    return raw ? JSON.parse(raw) as Record<string, string> : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeLastReadMap(userId: string, value: Record<string, string>) {
-  try {
-    localStorage.setItem(getUnreadStorageKey(userId), JSON.stringify(value));
-  } catch {
-    // ignore storage errors
-  }
-}
-
 function getPartnerId(friendship: Friendship, userId: string) {
   return friendship.requesterId === userId ? friendship.recipientId : friendship.requesterId;
 }
@@ -35,6 +14,7 @@ export default function FriendsPanel() {
   const [selectedFriend, setSelectedFriend] = useState<Friendship | null>(null);
   const [loading, setLoading] = useState(true);
   const [unreadByFriendship, setUnreadByFriendship] = useState<Record<string, number>>({});
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchFriends = useCallback(async () => {
     try {
@@ -50,6 +30,38 @@ export default function FriendsPanel() {
   useEffect(() => {
     fetchFriends();
   }, [fetchFriends]);
+
+  // Poll unread counts for accepted friends
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnread = async () => {
+      const accepted = friends.filter((f) => f.status === 'accepted');
+      if (accepted.length === 0) return;
+
+      try {
+        const results = await Promise.all(
+          accepted.map(async (f) => {
+            const partnerId = getPartnerId(f, user.id);
+            const res = await api.getFriendChat(partnerId);
+            const lastReadKey = `sb_lastread_${f.id}`;
+            const lastReadAt = localStorage.getItem(lastReadKey) ?? '';
+            const unread = res.messages.filter(
+              (m) => m.senderId !== user.id && (!lastReadAt || m.createdAt > lastReadAt),
+            ).length;
+            return [f.id, unread] as const;
+          }),
+        );
+        setUnreadByFriendship(Object.fromEntries(results));
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchUnread();
+    pollRef.current = setInterval(fetchUnread, 10000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [user, friends]);
 
   const handleAccept = async (friendshipId: string) => {
     try {
@@ -69,38 +81,23 @@ export default function FriendsPanel() {
     }
   };
 
-  const markConversationRead = useCallback((friendshipId: string, latestMessageAt?: string) => {
-    if (!user || !latestMessageAt) return;
-
-    setUnreadByFriendship((prev) => {
-      if (!prev[friendshipId]) return prev;
-      return { ...prev, [friendshipId]: 0 };
-    });
-
-    const next = {
-      ...readLastReadMap(user.id),
-      [friendshipId]: latestMessageAt,
-    };
-    writeLastReadMap(user.id, next);
-  }, [user]);
-
-  const handleBack = useCallback(() => setSelectedFriend(null), []);
-  const handleMessagesSeen = useCallback((latestMessageAt?: string) => {
-    if (selectedFriend) {
-      markConversationRead(selectedFriend.id, latestMessageAt);
-    }
-  }, [selectedFriend, markConversationRead]);
+  const markRead = useCallback((friendshipId: string, latestAt?: string) => {
+    if (!latestAt) return;
+    localStorage.setItem(`sb_lastread_${friendshipId}`, latestAt);
+    setUnreadByFriendship((prev) => ({ ...prev, [friendshipId]: 0 }));
+  }, []);
 
   if (selectedFriend && user) {
     const partnerId = getPartnerId(selectedFriend, user.id);
     const partnerName = selectedFriend.partnerProfile?.name ?? 'Friend';
     return (
       <FriendChat
+        key={selectedFriend.id}
         friendshipId={selectedFriend.id}
         friendId={partnerId}
         friendName={partnerName}
-        onBack={handleBack}
-        onMessagesSeen={handleMessagesSeen}
+        onBack={() => setSelectedFriend(null)}
+        onMarkRead={markRead}
       />
     );
   }
@@ -112,46 +109,6 @@ export default function FriendsPanel() {
   const pendingOutgoing = friends.filter(
     (f) => f.status === 'pending' && f.requesterId === user?.id,
   );
-
-  const fetchUnreadCounts = useCallback(async (acceptedFriends: Friendship[]) => {
-    if (!user || acceptedFriends.length === 0) {
-      setUnreadByFriendship({});
-      return;
-    }
-
-    const readMap = readLastReadMap(user.id);
-
-    try {
-      const results = await Promise.all(
-        acceptedFriends.map(async (friendship) => {
-          const partnerId = getPartnerId(friendship, user.id);
-          const res = await api.getFriendChat(partnerId);
-          const lastReadAt = readMap[friendship.id];
-          const unreadCount = res.messages.filter(
-            (message) =>
-              message.senderId !== user.id
-              && (!lastReadAt || message.createdAt > lastReadAt),
-          ).length;
-          return [friendship.id, unreadCount] as const;
-        }),
-      );
-
-      setUnreadByFriendship(Object.fromEntries(results));
-    } catch {
-      // ignore
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    fetchUnreadCounts(accepted);
-    const interval = setInterval(() => {
-      fetchUnreadCounts(accepted);
-    }, 10000);
-    return () => {
-      clearInterval(interval);
-    };
-  }, [accepted, fetchUnreadCounts, user]);
 
   return (
     <div className={styles.panel}>
@@ -187,16 +144,10 @@ export default function FriendsPanel() {
                     </span>
                   </div>
                   <div className={styles.requestActions}>
-                    <button
-                      className={styles.acceptBtn}
-                      onClick={() => handleAccept(f.id)}
-                    >
+                    <button className={styles.acceptBtn} onClick={() => handleAccept(f.id)}>
                       Accept
                     </button>
-                    <button
-                      className={styles.rejectBtn}
-                      onClick={() => handleReject(f.id)}
-                    >
+                    <button className={styles.rejectBtn} onClick={() => handleReject(f.id)}>
                       Decline
                     </button>
                   </div>
@@ -227,7 +178,7 @@ export default function FriendsPanel() {
                   </div>
                   <div className={styles.friendAction}>
                     <MessageCircle size={16} className={styles.chatIcon} />
-                    {unreadByFriendship[f.id] > 0 && (
+                    {(unreadByFriendship[f.id] ?? 0) > 0 && (
                       <span className={styles.unreadBadge}>
                         {unreadByFriendship[f.id] > 9 ? '9+' : unreadByFriendship[f.id]}
                       </span>
@@ -268,13 +219,13 @@ function FriendChat({
   friendId,
   friendName,
   onBack,
-  onMessagesSeen,
+  onMarkRead,
 }: {
   friendshipId: string;
   friendId: string;
   friendName: string;
   onBack: () => void;
-  onMessagesSeen: (latestMessageAt?: string) => void;
+  onMarkRead: (friendshipId: string, latestAt?: string) => void;
 }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<FriendMessage[]>([]);
@@ -282,19 +233,21 @@ function FriendChat({
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const onMessagesSeenRef = useRef(onMessagesSeen);
-  onMessagesSeenRef.current = onMessagesSeen;
 
   const fetchMessages = useCallback(async () => {
     try {
       const res = await api.getFriendChat(friendId);
       setMessages(res.messages);
-      const latest = res.messages.length > 0 ? res.messages[res.messages.length - 1].createdAt : undefined;
-      onMessagesSeenRef.current(latest);
+      // Mark as read
+      if (res.messages.length > 0) {
+        onMarkRead(friendshipId, res.messages[res.messages.length - 1].createdAt);
+      }
     } catch {
       // ignore
     }
-  }, [friendId]);
+  // onMarkRead is stable (useCallback with []) so this is safe
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendId, friendshipId]);
 
   useEffect(() => {
     fetchMessages();
