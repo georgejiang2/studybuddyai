@@ -66,7 +66,6 @@ export interface ProfileSetupPayload {
   year: string;
   bio: string;
   subjects: string[];
-  studyStyles?: string[];
 }
 
 export interface MatchStatus {
