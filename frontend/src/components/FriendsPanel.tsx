@@ -332,6 +332,7 @@ function FriendChat({
   const [messages, setMessages] = useState<FriendMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [showUnfriendConfirm, setShowUnfriendConfirm] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -397,13 +398,28 @@ function FriendChat({
           </button>
           <button
             className={styles.unfriendBtn}
-            onClick={onUnfriend}
+            onClick={() => setShowUnfriendConfirm(true)}
             title="Unfriend"
           >
             <UserMinus size={14} />
           </button>
         </div>
       </div>
+      {showUnfriendConfirm && (
+        <div className={styles.confirmOverlay}>
+          <div className={styles.confirmCard}>
+            <p>Are you sure you want to unadd <strong>{friendName}</strong>?</p>
+            <div className={styles.confirmActions}>
+              <button className={styles.confirmYes} onClick={onUnfriend}>
+                Yes, remove
+              </button>
+              <button className={styles.confirmNo} onClick={() => setShowUnfriendConfirm(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={styles.chatMessages}>
         {messages.length === 0 && (
           <div className={styles.chatEmpty}>
