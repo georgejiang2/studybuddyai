@@ -261,13 +261,12 @@ function buildMatchReason(
   }
 
   if (parts.length === 0) {
-    return `Matched with ${partner.name} — ${Math.round(score.total * 100)}% compatible.`;
+    return `Matched with ${partner.name} based on your profiles.`;
   }
 
   // Capitalize first part, join with commas
   parts[0] = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-  const reason = parts.join(", ") + `.`;
-  return `${reason} ${Math.round(score.total * 100)}% compatible.`;
+  return parts.join(", ") + `.`;
 }
 
 function getOverlappingSubjectNames(userA: string, userB: string): string[] {
