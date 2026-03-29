@@ -27,6 +27,25 @@ import {
 import { api, type SessionMessage, type SessionJoinPayload, type PartnerProfile } from '../api/client';
 import styles from './StudySession.module.css';
 
+// Subtle ping sound using Web Audio API — no external file needed
+function playPing() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {
+    // audio not available
+  }
+}
+
 interface Props {
   sessionPayload: SessionJoinPayload;
   partnerProfile: PartnerProfile | null;
@@ -63,6 +82,7 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
   const handleNewMessages = useCallback((count: number) => {
     if (!chatOpen && count > lastSeenCountRef.current) {
       setUnreadCount(count - lastSeenCountRef.current);
+      playPing();
     }
     if (chatOpen) {
       lastSeenCountRef.current = count;
