@@ -435,43 +435,6 @@
   color: var(--text);
 }
 
-.editBtn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.editBtn:hover {
-  color: var(--text);
-  background: var(--bg);
-}
-
-.editClose {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius);
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.editClose:hover {
-  color: var(--text);
-  background: var(--white);
-}
 
 .editError {
   padding: 8px 20px;
@@ -623,13 +586,6 @@
 .addSubjectBtn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-}
-
-.editActions {
-  display: flex;
-  gap: 8px;
-  padding: 12px 20px;
-  border-top: 1px solid var(--border);
 }
 
 .infoItemCol {
@@ -784,55 +740,6 @@
   padding-right: 36px;
 }
 
-/* Subject picker */
-.subjectPicker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 24px;
-}
-
-.subjectChip {
-  padding: 8px 16px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 100px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.subjectChip:hover {
-  border-color: var(--text-muted);
-}
-
-.subjectActive {
-  color: var(--accent-inv);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.searchActions {
-  display: flex;
-  gap: 10px;
-}
-
-/* Center layout for searching/matched */
-.center {
-  text-align: center;
-  padding-top: 48px;
-}
-
-.center .greeting {
-  margin-top: 16px;
-}
-
-.center .sub {
-  margin-bottom: 24px;
-}
-
 .spin {
   color: var(--text-muted);
   animation: spin 1s linear infinite;
@@ -897,73 +804,6 @@
   color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 16px;
-}
-
-/* Study style grid */
-.styleGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-@media (max-width: 500px) {
-  .styleGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.styleOption {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--white);
-  cursor: pointer;
-  transition: all 0.15s;
-  text-align: left;
-}
-
-.styleOption:hover {
-  border-color: var(--text-muted);
-  background: var(--bg);
-}
-
-.styleSelected {
-  border-color: #7c3aed;
-  background: #f5f3ff;
-}
-
-.styleSelected:hover {
-  border-color: #7c3aed;
-  background: #f5f3ff;
-}
-
-:global([data-theme="dark"]) .styleSelected {
-  border-color: #7c3aed;
-  background: rgba(124, 58, 237, 0.12);
-}
-
-:global([data-theme="dark"]) .styleSelected:hover {
-  background: rgba(124, 58, 237, 0.15);
-}
-
-.styleEmoji {
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.styleName {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.styleDesc {
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
 }
 
 .profileActions {
