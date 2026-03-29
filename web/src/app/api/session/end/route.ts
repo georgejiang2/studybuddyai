@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 
 import { getRequestUser } from "@/lib/studybuddy/auth";
 import { badRequest, ok, unauthorized, notFound } from "@/lib/studybuddy/http";
-import { endSession, getSession, getMatch } from "@/lib/studybuddy/store";
+import { endSession, getSession, getMatch, endCallBySessionId } from "@/lib/studybuddy/store";
 
 export async function POST(request: NextRequest) {
   const user = await getRequestUser(request);
@@ -29,5 +29,6 @@ export async function POST(request: NextRequest) {
   }
 
   const ended = await endSession(sessionId);
+  await endCallBySessionId(sessionId);
   return ok({ session: ended });
 }

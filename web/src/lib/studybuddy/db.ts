@@ -100,6 +100,16 @@ export async function initDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS calls (
+      id TEXT PRIMARY KEY,
+      caller_id TEXT NOT NULL REFERENCES users(id),
+      recipient_id TEXT NOT NULL REFERENCES users(id),
+      match_id TEXT NOT NULL REFERENCES matches(id),
+      session_id TEXT NOT NULL REFERENCES sessions(id),
+      status TEXT NOT NULL DEFAULT 'ringing',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS session_messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL REFERENCES sessions(id),

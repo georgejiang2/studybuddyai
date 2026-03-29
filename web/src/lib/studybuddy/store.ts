@@ -10,6 +10,8 @@ import {
   type QueueEntry,
   type SessionRecord,
   type SessionMessageRecord,
+  type CallRecord,
+  type CallStatus,
 } from "@/lib/studybuddy/types";
 
 function nowIso() {
@@ -428,4 +430,66 @@ export async function getSubjectOverlap(userA: string, userB: string): Promise<s
   const subjectsA = new Set((await getProfileSubjects(userA)).map(normalizeSubject));
   const subjectsB = (await getProfileSubjects(userB)).map(normalizeSubject);
   return subjectsB.filter((s) => subjectsA.has(s));
+}
+
+// ── Calls ──────────────────────────────────────────────
+
+function mapCallRow(row: {
+  id: string; caller_id: string; recipient_id: string; match_id: string;
+  session_id: string; status: string; created_at: string;
+}): CallRecord {
+  return {
+    id: row.id, callerId: row.caller_id, recipientId: row.recipient_id,
+    matchId: row.match_id, sessionId: row.session_id,
+    status: row.status as CallStatus, createdAt: row.created_at,
+  };
+}
+
+export async function createCall(
+  callerId: string, recipientId: string, matchId: string, sessionId: string,
+): Promise<CallRecord> {
+  const id = makeId("call");
+  const now = nowIso();
+  await query(
+    "INSERT INTO calls (id, caller_id, recipient_id, match_id, session_id, status, created_at) VALUES ($1,$2,$3,$4,$5,'ringing',$6)",
+    [id, callerId, recipientId, matchId, sessionId, now],
+  );
+  return { id, callerId, recipientId, matchId, sessionId, status: "ringing", createdAt: now };
+}
+
+export async function getCall(callId: string): Promise<CallRecord | null> {
+  const res = await query<{
+    id: string; caller_id: string; recipient_id: string; match_id: string;
+    session_id: string; status: string; created_at: string;
+  }>("SELECT * FROM calls WHERE id = $1", [callId]);
+  return res.rows[0] ? mapCallRow(res.rows[0]) : null;
+}
+
+export async function getIncomingCall(recipientId: string): Promise<CallRecord | null> {
+  const res = await query<{
+    id: string; caller_id: string; recipient_id: string; match_id: string;
+    session_id: string; status: string; created_at: string;
+  }>("SELECT * FROM calls WHERE recipient_id = $1 AND status = 'ringing' ORDER BY created_at DESC LIMIT 1", [recipientId]);
+  return res.rows[0] ? mapCallRow(res.rows[0]) : null;
+}
+
+export async function getOutgoingCall(callerId: string): Promise<CallRecord | null> {
+  const res = await query<{
+    id: string; caller_id: string; recipient_id: string; match_id: string;
+    session_id: string; status: string; created_at: string;
+  }>("SELECT * FROM calls WHERE caller_id = $1 AND status = 'ringing' ORDER BY created_at DESC LIMIT 1", [callerId]);
+  return res.rows[0] ? mapCallRow(res.rows[0]) : null;
+}
+
+export async function updateCallStatus(callId: string, status: CallStatus): Promise<CallRecord | null> {
+  await query("UPDATE calls SET status = $1 WHERE id = $2", [status, callId]);
+  return getCall(callId);
+}
+
+export async function expireStaleRingingCalls(): Promise<void> {
+  await query("UPDATE calls SET status = 'cancelled' WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '60 seconds'");
+}
+
+export async function endCallBySessionId(sessionId: string): Promise<void> {
+  await query("UPDATE calls SET status = 'ended' WHERE session_id = $1 AND status = 'accepted'", [sessionId]);
 }

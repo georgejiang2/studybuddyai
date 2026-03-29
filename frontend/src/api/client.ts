@@ -114,6 +114,22 @@ export interface FriendMessage {
   createdAt: string;
 }
 
+export interface CallRecord {
+  id: string;
+  callerId: string;
+  recipientId: string;
+  matchId: string;
+  sessionId: string;
+  status: 'ringing' | 'accepted' | 'declined' | 'cancelled' | 'ended';
+  createdAt: string;
+}
+
+export interface CallerProfile {
+  name: string;
+  school: string;
+  major: string;
+}
+
 export const api = {
   signup(email: string, password: string) {
     return request<AuthResponse>('/api/auth/signup', {
@@ -219,5 +235,35 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ text }),
     });
+  },
+
+  // Friend Calls
+  startFriendCall(recipientId: string) {
+    return request<{ call: CallRecord }>('/api/friends/call', {
+      method: 'POST',
+      body: JSON.stringify({ recipientId }),
+    });
+  },
+
+  getIncomingCall() {
+    return request<{ call: CallRecord | null; callerProfile: CallerProfile | null }>('/api/friends/incoming-call');
+  },
+
+  respondToCall(callId: string, action: 'accept' | 'decline') {
+    return request<{ call: CallRecord; sessionJoinPayload?: SessionJoinPayload }>('/api/friends/call/respond', {
+      method: 'POST',
+      body: JSON.stringify({ callId, action }),
+    });
+  },
+
+  cancelCall(callId: string) {
+    return request<{ call: CallRecord }>('/api/friends/call/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ callId }),
+    });
+  },
+
+  getCallStatus(callId: string) {
+    return request<{ call: CallRecord; sessionJoinPayload?: SessionJoinPayload; partnerProfile?: PartnerProfile | null }>(`/api/friends/call/status?callId=${callId}`);
   },
 };

@@ -5,7 +5,7 @@ export type AcademicYear =
   | "senior"
   | "grad";
 
-export type MatchType = "same_subject" | "expanded";
+export type MatchType = "same_subject" | "expanded" | "friend_call";
 
 export type QueueStatus = "waiting";
 
@@ -86,6 +86,18 @@ export interface SessionMessageRecord {
   senderId: string;
   senderName: string;
   text: string;
+  createdAt: string;
+}
+
+export type CallStatus = "ringing" | "accepted" | "declined" | "cancelled" | "ended";
+
+export interface CallRecord {
+  id: string;
+  callerId: string;
+  recipientId: string;
+  matchId: string;
+  sessionId: string;
+  status: CallStatus;
   createdAt: string;
 }
 

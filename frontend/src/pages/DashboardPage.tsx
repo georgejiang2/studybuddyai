@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
-import { BookOpen, LogOut, Video, Users, Home, Pencil, X, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, LogOut, Video, Users, Home, Pencil, X, Plus, Trash2, Phone, PhoneOff } from 'lucide-react';
 import Autocomplete from '../components/Autocomplete';
 import schools from '../data/schools.json';
 import majors from '../data/majors.json';
 import { useAuth } from '../context/AuthContext';
-import { api, ApiError, type MatchStatus, type SessionJoinPayload, type PartnerProfile } from '../api/client';
+import { api, ApiError, type MatchStatus, type SessionJoinPayload, type PartnerProfile, type CallRecord, type CallerProfile } from '../api/client';
 import ThemeToggle from '../components/ThemeToggle';
 import MatchingScreen from '../components/MatchingScreen';
 import StudySession from '../components/StudySession';
@@ -21,7 +21,10 @@ export default function DashboardPage() {
   const [partnerProfile, setPartnerProfile] = useState<PartnerProfile | null>(null);
 
   const [pendingFriendCount, setPendingFriendCount] = useState(0);
+  const [incomingCall, setIncomingCall] = useState<{ call: CallRecord; callerProfile: CallerProfile } | null>(null);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const friendPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const callPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const profile = meData?.profile;
   const subjects = meData?.subjects ?? [];
@@ -50,6 +53,24 @@ export default function DashboardPage() {
       if (friendPollRef.current) clearInterval(friendPollRef.current);
     };
   }, [profileDone, fetchPendingFriends]);
+
+  // Poll for incoming friend calls
+  useEffect(() => {
+    if (!profileDone || view === 'session') return;
+    const pollCall = async () => {
+      try {
+        const res = await api.getIncomingCall();
+        if (res.call && res.callerProfile) {
+          setIncomingCall({ call: res.call, callerProfile: res.callerProfile });
+        } else {
+          setIncomingCall(null);
+        }
+      } catch { /* ignore */ }
+    };
+    pollCall();
+    callPollRef.current = setInterval(pollCall, 3000);
+    return () => { if (callPollRef.current) clearInterval(callPollRef.current); };
+  }, [profileDone, view]);
 
   // Check if user already has an active session on load
   useEffect(() => {
@@ -89,13 +110,67 @@ export default function DashboardPage() {
   const handleSessionEnd = () => {
     setSessionPayload(null);
     setPartnerProfile(null);
+    setSessionEnded(true);
     setView('home');
     refresh();
+  };
+
+  const handleAcceptCall = async () => {
+    if (!incomingCall) return;
+    try {
+      const res = await api.respondToCall(incomingCall.call.id, 'accept');
+      setIncomingCall(null);
+      if (res.sessionJoinPayload) {
+        setSessionPayload(res.sessionJoinPayload);
+        setPartnerProfile(null);
+        setView('session');
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleDeclineCall = async () => {
+    if (!incomingCall) return;
+    try {
+      await api.respondToCall(incomingCall.call.id, 'decline');
+    } catch { /* ignore */ }
+    setIncomingCall(null);
+  };
+
+  const handleCallAccepted = (payload: SessionJoinPayload, partner: PartnerProfile | null) => {
+    setSessionPayload(payload);
+    setPartnerProfile(partner);
+    setView('session');
   };
 
   const handleLogout = async () => {
     await logout();
   };
+
+  // Session ended screen
+  if (sessionEnded) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.sessionEndedOverlay}>
+          <h2>Session ended</h2>
+          <p>What would you like to do next?</p>
+          <div className={styles.sessionEndedActions}>
+            <button
+              className={styles.startBtn}
+              onClick={() => { setSessionEnded(false); setView('searching'); }}
+            >
+              Find another partner
+            </button>
+            <button
+              className={styles.secondaryBtn}
+              onClick={() => { setSessionEnded(false); setView('home'); }}
+            >
+              Return home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Full-screen session view (no nav)
   if (view === 'session' && sessionPayload) {
@@ -111,6 +186,28 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
+      {/* Incoming call overlay */}
+      {incomingCall && (
+        <div className={styles.incomingCallOverlay}>
+          <div className={styles.incomingCallCard}>
+            <div className={styles.incomingCallAvatar}>
+              {incomingCall.callerProfile.name.charAt(0).toUpperCase()}
+            </div>
+            <h2>{incomingCall.callerProfile.name}</h2>
+            <p>{incomingCall.callerProfile.school} &middot; {incomingCall.callerProfile.major}</p>
+            <span className={styles.incomingCallLabel}>Incoming call...</span>
+            <div className={styles.incomingCallActions}>
+              <button className={styles.acceptCallBtn} onClick={handleAcceptCall}>
+                <Phone size={20} />
+              </button>
+              <button className={styles.declineCallBtn} onClick={handleDeclineCall}>
+                <PhoneOff size={20} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav className={styles.nav}>
         <div className={styles.navInner}>
           <span className={styles.logo}>
@@ -159,7 +256,7 @@ export default function DashboardPage() {
         />
       ) : view === 'friends' ? (
         <main className={styles.friendsMain}>
-          <FriendsPanel />
+          <FriendsPanel onCallAccepted={handleCallAccepted} />
         </main>
       ) : (
         <main className={styles.main}>

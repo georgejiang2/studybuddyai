@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
-import { MessageCircle, Clock, Send, ArrowLeft, Users } from 'lucide-react';
-import { api, type Friendship, type FriendMessage } from '../api/client';
+import { MessageCircle, Clock, Send, ArrowLeft, Users, Phone, PhoneOff, Loader2 } from 'lucide-react';
+import { api, type Friendship, type FriendMessage, type CallRecord, type SessionJoinPayload, type PartnerProfile } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import styles from './FriendsPanel.module.css';
 
@@ -8,13 +8,20 @@ function getPartnerId(friendship: Friendship, userId: string) {
   return friendship.requesterId === userId ? friendship.recipientId : friendship.requesterId;
 }
 
-export default function FriendsPanel() {
+interface FriendsPanelProps {
+  onCallAccepted?: (payload: SessionJoinPayload, partner: PartnerProfile | null) => void;
+}
+
+export default function FriendsPanel({ onCallAccepted }: FriendsPanelProps) {
   const { user } = useAuth();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<Friendship | null>(null);
   const [loading, setLoading] = useState(true);
   const [unreadByFriendship, setUnreadByFriendship] = useState<Record<string, number>>({});
+  const [callingFriend, setCallingFriend] = useState<Friendship | null>(null);
+  const [activeCall, setActiveCall] = useState<CallRecord | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const callPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchFriends = useCallback(async () => {
     try {
@@ -86,6 +93,73 @@ export default function FriendsPanel() {
     localStorage.setItem(`sb_lastread_${friendshipId}`, latestAt);
     setUnreadByFriendship((prev) => ({ ...prev, [friendshipId]: 0 }));
   }, []);
+
+  const handleStartCall = async (friend: Friendship) => {
+    if (!user) return;
+    const recipientId = getPartnerId(friend, user.id);
+    try {
+      setCallingFriend(friend);
+      const res = await api.startFriendCall(recipientId);
+      setActiveCall(res.call);
+
+      // Poll for call status
+      callPollRef.current = setInterval(async () => {
+        try {
+          const status = await api.getCallStatus(res.call.id);
+          if (status.call.status === 'accepted' && status.sessionJoinPayload) {
+            if (callPollRef.current) clearInterval(callPollRef.current);
+            setCallingFriend(null);
+            setActiveCall(null);
+            onCallAccepted?.(status.sessionJoinPayload, status.partnerProfile ?? null);
+          } else if (status.call.status === 'declined' || status.call.status === 'cancelled') {
+            if (callPollRef.current) clearInterval(callPollRef.current);
+            setCallingFriend(null);
+            setActiveCall(null);
+          }
+        } catch {
+          // ignore
+        }
+      }, 2000);
+    } catch {
+      setCallingFriend(null);
+      setActiveCall(null);
+    }
+  };
+
+  const handleCancelCall = async () => {
+    if (callPollRef.current) clearInterval(callPollRef.current);
+    if (activeCall) {
+      try { await api.cancelCall(activeCall.id); } catch { /* ignore */ }
+    }
+    setCallingFriend(null);
+    setActiveCall(null);
+  };
+
+  // Cleanup call poll on unmount
+  useEffect(() => {
+    return () => { if (callPollRef.current) clearInterval(callPollRef.current); };
+  }, []);
+
+  // Show outgoing call UI
+  if (callingFriend) {
+    const callingName = callingFriend.partnerProfile?.name ?? 'Friend';
+    return (
+      <div className={styles.panel}>
+        <div className={styles.callingOverlay}>
+          <div className={styles.callingAvatar}>
+            {callingName.charAt(0).toUpperCase()}
+          </div>
+          <h2 className={styles.callingTitle}>Calling {callingName}...</h2>
+          <p className={styles.callingSubtitle}>Waiting for them to pick up</p>
+          <Loader2 size={24} className={styles.callingSpin} />
+          <button className={styles.cancelCallBtn} onClick={handleCancelCall}>
+            <PhoneOff size={18} />
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedFriend && user) {
     const partnerId = getPartnerId(selectedFriend, user.id);
@@ -176,13 +250,22 @@ export default function FriendsPanel() {
                       {f.partnerProfile?.school} &middot; {f.partnerProfile?.major}
                     </span>
                   </div>
-                  <div className={styles.friendAction}>
-                    <MessageCircle size={16} className={styles.chatIcon} />
-                    {(unreadByFriendship[f.id] ?? 0) > 0 && (
-                      <span className={styles.unreadBadge}>
-                        {unreadByFriendship[f.id] > 9 ? '9+' : unreadByFriendship[f.id]}
-                      </span>
-                    )}
+                  <div className={styles.friendActions}>
+                    <button
+                      className={styles.callFriendBtn}
+                      onClick={(e) => { e.stopPropagation(); handleStartCall(f); }}
+                      title="Call"
+                    >
+                      <Phone size={14} />
+                    </button>
+                    <div className={styles.friendAction}>
+                      <MessageCircle size={16} className={styles.chatIcon} />
+                      {(unreadByFriendship[f.id] ?? 0) > 0 && (
+                        <span className={styles.unreadBadge}>
+                          {unreadByFriendship[f.id] > 9 ? '9+' : unreadByFriendship[f.id]}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
