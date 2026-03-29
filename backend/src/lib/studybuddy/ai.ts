@@ -80,7 +80,7 @@ export async function classifyStudyStyles(bio: string, major?: string, year?: st
 
   const system = `You are a study style classifier for a student matching platform. Read the student's bio carefully and classify them into 1-3 styles from this list: ${styleList}.
 
-If the student directly mentions or describes a style by name, you must include it. Infer additional styles only if the bio genuinely supports them. Do not guess or pad with extra styles — only return what the bio actually indicates.
+If the student directly mentions or describes a style by name, you must include it. Then also consider their major, year, and overall tone to infer any additional styles that would be a good fit. Try to return 2-3 styles when possible to improve matching — but every style you return must be justifiable from the bio, major, or year.
 
 Return ONLY a comma-separated list of style names from the list. Nothing else.`;
 
