@@ -117,7 +117,8 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
         // ignore
       }
     };
-    sessionStatusPollRef.current = setInterval(poll, 3000);
+    poll(); // check immediately
+    sessionStatusPollRef.current = setInterval(poll, 2000); // poll every 2s
     return () => { if (sessionStatusPollRef.current) clearInterval(sessionStatusPollRef.current); };
   }, [sessionPayload.sessionId, onSkippedByPartner]);
 
@@ -133,8 +134,28 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
   };
 
   const handleEndSession = async () => {
+    if (sessionEndedRef.current) return; // already handled (e.g. skip detection)
     try {
       await api.endSession(sessionPayload.sessionId);
+    } catch {
+      // ignore
+    }
+    onEnd();
+  };
+
+  // Called when LiveKit disconnects — could be partner skipping or normal end
+  const handleDisconnected = async () => {
+    if (sessionEndedRef.current) return; // skip handler already fired
+    // Check if we were skipped before falling back to normal end
+    try {
+      const res = await api.getSessionStatus(sessionPayload.sessionId);
+      if (res.skippedByPartner) {
+        sessionEndedRef.current = true;
+        if (sessionStatusPollRef.current) clearInterval(sessionStatusPollRef.current);
+        if (bgPollRef.current) clearInterval(bgPollRef.current);
+        onSkippedByPartner();
+        return;
+      }
     } catch {
       // ignore
     }
@@ -213,7 +234,7 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
       audio={true}
       video={true}
       className={styles.room}
-      onDisconnected={handleEndSession}
+      onDisconnected={handleDisconnected}
     >
       <RoomAudioRenderer />
       <SessionContent
