@@ -29,6 +29,7 @@ export default function DashboardPage() {
 
   const profile = meData?.profile;
   const subjects = meData?.subjects ?? [];
+  const studyStyles = meData?.studyStyles ?? [];
   const profileDone = meData?.profileCompleted ?? false;
   const displayName = profile?.name || user?.email?.split('@')[0] || 'Student';
 
@@ -332,6 +333,7 @@ export default function DashboardPage() {
                       profile={profile}
                       email={user?.email ?? ''}
                       subjects={subjects}
+                      studyStyles={studyStyles}
                       onSaved={refresh}
                     />
                   </div>
@@ -441,11 +443,13 @@ function ProfileEditor({
   profile,
   email,
   subjects,
+  studyStyles,
   onSaved,
 }: {
   profile: import('../api/client').Profile | null | undefined;
   email: string;
   subjects: string[];
+  studyStyles: string[];
   onSaved: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -617,6 +621,16 @@ function ProfileEditor({
             {subjects.length > 3 && (
               <span className={styles.subjectMore}>+{subjects.length - 3}</span>
             )}
+          </div>
+        </div>
+      )}
+      {studyStyles.length > 0 && (
+        <div className={styles.infoItemCol}>
+          <span className={styles.infoLabel}>Study Style</span>
+          <div className={styles.subjectChips}>
+            {studyStyles.map((s) => (
+              <span key={s} className={styles.styleChip}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>
+            ))}
           </div>
         </div>
       )}

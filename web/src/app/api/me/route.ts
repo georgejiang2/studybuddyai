@@ -7,6 +7,7 @@ import { getUserMatchStatus } from "@/lib/studybuddy/matching";
 import {
   getProfile,
   getProfileSubjects,
+  getStudyStyles,
   isProfileComplete,
   listFriendshipsForUser,
 } from "@/lib/studybuddy/store";
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     user,
     profile: await getProfile(user.id),
     subjects: await getProfileSubjects(user.id),
+    studyStyles: await getStudyStyles(user.id),
     profileCompleted: await isProfileComplete(user.id),
     matchStatus: await getUserMatchStatus(user.id),
     friendships,

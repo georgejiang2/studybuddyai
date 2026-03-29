@@ -122,6 +122,7 @@ export interface PartnerProfileSummary {
   year: AcademicYear;
   bio: string;
   subjects: string[];
+  studyStyles: string[];
 }
 
 export interface MatchStatusResponse {

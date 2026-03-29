@@ -112,6 +112,13 @@ export async function initDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS study_styles (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      style TEXT NOT NULL,
+      UNIQUE(user_id, style)
+    );
+
     CREATE TABLE IF NOT EXISTS skips (
       id SERIAL PRIMARY KEY,
       skipper_id TEXT NOT NULL REFERENCES users(id),
@@ -190,6 +197,23 @@ export async function seedDemoUsers() {
     await query(
       "INSERT INTO profile_subjects (user_id, subject) VALUES ($1, $2) ON CONFLICT DO NOTHING",
       [userId, subject],
+    );
+  }
+
+  // Seed study styles for demo users
+  const styleInserts = [
+    ["demo-user-1", "focused"],
+    ["demo-user-1", "competitive"],
+    ["demo-user-2", "collaborative"],
+    ["demo-user-2", "focused"],
+    ["demo-user-3", "competitive"],
+    ["demo-user-3", "cramming"],
+  ];
+
+  for (const [userId, style] of styleInserts) {
+    await query(
+      "INSERT INTO study_styles (user_id, style) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      [userId, style],
     );
   }
 }

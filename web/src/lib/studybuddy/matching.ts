@@ -7,6 +7,7 @@ import {
   getProfileSubjects,
   getQueueEntry,
   getRecentlySkipped,
+  getStudyStyles,
   isProfileComplete,
   listMatchesForUser,
   listQueueEntries,
@@ -21,12 +22,13 @@ const MINIMUM_MATCH_SCORE = 0.25; // 0–1 scale
 
 // Weights must sum to 1.0
 const WEIGHTS = {
-  currentSubject: 0.35,
-  subjects: 0.25,
-  school: 0.15,
-  major: 0.15,
+  currentSubject: 0.30,
+  subjects: 0.20,
+  school: 0.12,
+  major: 0.13,
+  studyStyle: 0.10,  // AI-classified study style compatibility
   year: 0.05,
-  wait: 0.05,
+  wait: 0.10,
 };
 
 // Filler words to strip from school/major names before tokenizing
@@ -162,6 +164,7 @@ interface MatchScore {
     subjects: number;
     school: number;
     major: number;
+    studyStyle: number;
     year: number;
     wait: number;
   };
@@ -197,6 +200,11 @@ async function computeMatchScore(
 
   const yearScore = yearSimilarity(profileA.year, profileB.year);
 
+  // Study style similarity (AI-classified via Claude)
+  const stylesA = new Set(await getStudyStyles(userId));
+  const stylesB = new Set(await getStudyStyles(candidateId));
+  const studyStyleScore = jaccard(stylesA, stylesB);
+
   // Average of both users' wait bonus
   const waitScore =
     (waitSimilarity(userQueuedAt) + waitSimilarity(candidateQueuedAt)) / 2;
@@ -206,6 +214,7 @@ async function computeMatchScore(
     WEIGHTS.subjects * subjectsScore +
     WEIGHTS.school * schoolScore +
     WEIGHTS.major * majorScore +
+    WEIGHTS.studyStyle * studyStyleScore +
     WEIGHTS.year * yearScore +
     WEIGHTS.wait * waitScore;
 
@@ -217,6 +226,7 @@ async function computeMatchScore(
       subjects: subjectsScore,
       school: schoolScore,
       major: majorScore,
+      studyStyle: studyStyleScore,
       year: yearScore,
       wait: waitScore,
     },
@@ -255,6 +265,10 @@ async function buildMatchReason(
     if (overlap.length > 0) {
       parts.push(`you both study ${overlap.slice(0, 2).join(" and ")}`);
     }
+  }
+
+  if (score.breakdown.studyStyle >= 0.5) {
+    parts.push(`similar study styles`);
   }
 
   if (score.breakdown.year >= 0.75) {
@@ -297,6 +311,7 @@ async function buildPartnerProfile(userId: string): Promise<PartnerProfileSummar
     year: profile.year,
     bio: profile.bio,
     subjects: await getProfileSubjects(userId),
+    studyStyles: await getStudyStyles(userId),
   };
 }
 

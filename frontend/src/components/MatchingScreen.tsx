@@ -197,6 +197,15 @@ function MatchFound({
                   ))}
                 </div>
               )}
+              {partner.studyStyles && partner.studyStyles.length > 0 && (
+                <div className={styles.partnerSubjects}>
+                  {partner.studyStyles.map((s) => (
+                    <span key={s} className={styles.styleTag}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

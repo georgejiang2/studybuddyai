@@ -358,6 +358,28 @@ export async function deleteFriendship(friendshipId: string): Promise<void> {
   await query("DELETE FROM friends WHERE id = $1", [friendshipId]);
 }
 
+// ── Study Styles ──────────────────────────────────────
+
+export async function getStudyStyles(userId: string): Promise<string[]> {
+  const res = await query<{ style: string }>(
+    "SELECT style FROM study_styles WHERE user_id = $1 ORDER BY id",
+    [userId],
+  );
+  return res.rows.map((r) => r.style);
+}
+
+export async function upsertStudyStyles(userId: string, styles: string[]): Promise<string[]> {
+  await query("DELETE FROM study_styles WHERE user_id = $1", [userId]);
+  const unique = [...new Set(styles.map((s) => s.trim().toLowerCase()).filter(Boolean))];
+  for (const style of unique) {
+    await query(
+      "INSERT INTO study_styles (user_id, style) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      [userId, style],
+    );
+  }
+  return unique;
+}
+
 // ── Messages ───────────────────────────────────────────
 
 export async function createMessage(

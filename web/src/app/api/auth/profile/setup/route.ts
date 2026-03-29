@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
 
 import { getRequestUser } from "@/lib/studybuddy/auth";
+import { classifyStudyStyles } from "@/lib/studybuddy/ai";
 import { badRequest, ok, unauthorized } from "@/lib/studybuddy/http";
 import {
   getProfile,
   getProfileSubjects,
+  getStudyStyles,
   isProfileComplete,
   upsertProfile,
+  upsertStudyStyles,
 } from "@/lib/studybuddy/store";
 import { type AcademicYear } from "@/lib/studybuddy/types";
 
@@ -48,10 +51,21 @@ export async function POST(request: NextRequest) {
     subjects: subjectList,
   });
 
+  // AI-powered study style classification (runs async, non-blocking for response)
+  // We fire it and await it so the styles are ready for matching
+  try {
+    const styles = await classifyStudyStyles(bio, major, normalizedYear);
+    await upsertStudyStyles(user.id, styles);
+  } catch {
+    // If AI fails, matching still works without study styles
+    console.error("[AI] Study style classification failed for user", user.id);
+  }
+
   return ok({
     user,
     profile: await getProfile(user.id),
     subjects: await getProfileSubjects(user.id),
+    studyStyles: await getStudyStyles(user.id),
     profileCompleted: await isProfileComplete(user.id),
   });
 }

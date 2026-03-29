@@ -641,6 +641,23 @@
   white-space: nowrap;
 }
 
+.styleChip {
+  padding: 4px 12px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #7c3aed;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+:global([data-theme="dark"]) .styleChip {
+  color: #c4b5fd;
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
 .subjectMore {
   padding: 4px 10px;
   font-size: 0.6875rem;

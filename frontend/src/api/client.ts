@@ -41,12 +41,14 @@ export interface PartnerProfile {
   year: string;
   bio: string;
   subjects: string[];
+  studyStyles?: string[];
 }
 
 export interface MeResponse {
   user: AuthUser;
   profile: Profile | null;
   subjects: string[] | null;
+  studyStyles: string[] | null;
   profileCompleted: boolean;
   matchStatus: MatchStatus;
   friendships: Friendship[];
