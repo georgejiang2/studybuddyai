@@ -58,42 +58,37 @@
   background: var(--bg);
 }
 
-/* Tab bar */
-.tabBar {
-  border-bottom: 1px solid var(--border);
-  background: var(--white);
-}
-
-.tabBarInner {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 0 24px;
+/* Nav tabs (inside navbar) */
+.navTabs {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
 }
 
 .tab {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
+  padding: 8px 14px;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-secondary);
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius);
   cursor: pointer;
-  transition: color 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
 
 .tab:hover {
   color: var(--text);
+  background: var(--bg);
 }
 
 .tabActive {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  background: var(--bg);
 }
 
 .tabBadge {
@@ -126,7 +121,7 @@
 .friendsMain {
   max-width: 600px;
   margin: 0 auto;
-  height: calc(100vh - 56px - 42px);
+  height: calc(100vh - 56px);
   overflow: hidden;
 }
 

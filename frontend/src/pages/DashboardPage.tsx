@@ -117,6 +117,29 @@ export default function DashboardPage() {
             <BookOpen size={22} strokeWidth={2.2} />
             <span>StudyBuddy</span>
           </span>
+
+          {profileDone && view !== 'searching' && (
+            <div className={styles.navTabs}>
+              <button
+                className={`${styles.tab} ${view === 'home' ? styles.tabActive : ''}`}
+                onClick={() => setView('home')}
+              >
+                <Home size={16} />
+                Home
+              </button>
+              <button
+                className={`${styles.tab} ${view === 'friends' ? styles.tabActive : ''}`}
+                onClick={() => { setView('friends'); fetchPendingFriends(); }}
+              >
+                <Users size={16} />
+                Friends
+                {pendingFriendCount > 0 && (
+                  <span className={styles.tabBadge}>{pendingFriendCount}</span>
+                )}
+              </button>
+            </div>
+          )}
+
           <div className={styles.navRight}>
             <ThemeToggle />
             <button onClick={handleLogout} className={styles.logoutBtn}>
@@ -126,31 +149,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </nav>
-
-      {/* Tab bar */}
-      {profileDone && view !== 'searching' && (
-        <div className={styles.tabBar}>
-          <div className={styles.tabBarInner}>
-            <button
-              className={`${styles.tab} ${view === 'home' ? styles.tabActive : ''}`}
-              onClick={() => setView('home')}
-            >
-              <Home size={16} />
-              Home
-            </button>
-            <button
-              className={`${styles.tab} ${view === 'friends' ? styles.tabActive : ''}`}
-              onClick={() => { setView('friends'); fetchPendingFriends(); }}
-            >
-              <Users size={16} />
-              Friends
-              {pendingFriendCount > 0 && (
-                <span className={styles.tabBadge}>{pendingFriendCount}</span>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
 
       {view === 'searching' ? (
         <MatchingScreen
