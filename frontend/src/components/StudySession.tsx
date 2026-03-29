@@ -324,10 +324,6 @@ function FallbackSession({
           </div>
         </div>
 
-        <div className={styles.matchBanner}>
-          {sessionPayload.matchReason}
-        </div>
-
         <ControlBar
           micOn={micOn}
           camOn={camOn}
@@ -501,10 +497,6 @@ function SessionContent({
               {remoteParticipant?.name || partnerName}
             </span>
           </div>
-        </div>
-
-        <div className={styles.matchBanner}>
-          {sessionPayload.matchReason}
         </div>
 
         <ControlBar
