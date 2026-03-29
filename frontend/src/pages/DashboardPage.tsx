@@ -167,7 +167,7 @@ export default function DashboardPage() {
         <main className={styles.main}>
           <div className={styles.content}>
             {!profileDone ? (
-              <ProfileSetup onDone={refresh} existingProfile={profile} existingSubjects={subjects} />
+              <ProfileSetup key={profile?.name ?? ''} onDone={refresh} existingProfile={profile} existingSubjects={subjects} />
             ) : (
               <>
                 <h1 className={styles.greeting}>Hey, {displayName}</h1>
@@ -222,15 +222,6 @@ function ProfileSetup({ onDone, existingProfile, existingSubjects }: {
   const [subjectsRaw, setSubjectsRaw] = useState(existingSubjects?.join(', ') ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Update fields when profile data arrives after signup
-  useEffect(() => {
-    if (existingProfile?.name && !name) setName(existingProfile.name);
-    if (existingProfile?.school && !school) setSchool(existingProfile.school);
-    if (existingProfile?.major && !major) setMajor(existingProfile.major);
-    if (existingProfile?.year && !year) setYear(existingProfile.year);
-    if (existingProfile?.bio && !bio) setBio(existingProfile.bio);
-  }, [existingProfile]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
