@@ -6,7 +6,6 @@ import {
   getProfile,
   getProfileSubjects,
   getQueueEntry,
-  getSubjectOverlap,
   isProfileComplete,
   listMatchesForUser,
   listQueueEntries,
@@ -15,60 +14,282 @@ import {
 } from "@/lib/studybuddy/store";
 import { type MatchStatusResponse, type PartnerProfileSummary } from "@/lib/studybuddy/types";
 
+// ── Config ──────────────────────────────────────────────
 const SUBJECT_STRICT_WINDOW_MS = 2 * 60 * 1000;
-const MINIMUM_MATCH_SCORE = 45;
+const MINIMUM_MATCH_SCORE = 0.25; // 0–1 scale
 
-function getWaitDurationMs(queuedAt: string) {
-  return Date.now() - new Date(queuedAt).getTime();
+// Weights must sum to 1.0
+const WEIGHTS = {
+  currentSubject: 0.35,
+  subjects: 0.25,
+  school: 0.15,
+  major: 0.15,
+  year: 0.05,
+  wait: 0.05,
+};
+
+// Filler words to strip from school/major names before tokenizing
+const FILLER_WORDS = new Set([
+  "of", "the", "and", "in", "at", "for", "a", "an",
+  "university", "college", "institute", "school",
+]);
+
+// ── Similarity functions (all return 0–1) ───────────────
+
+function tokenize(text: string): Set<string> {
+  return new Set(
+    normalizeString(text)
+      .split(/\s+/)
+      .filter((w) => w.length > 0 && !FILLER_WORDS.has(w)),
+  );
 }
 
-function majorSimilarity(majorA: string, majorB: string) {
-  const normalizedA = normalizeString(majorA);
-  const normalizedB = normalizeString(majorB);
+/**
+ * Jaccard similarity: |A ∩ B| / |A ∪ B|
+ * Returns 0 if both sets are empty, 1 if identical.
+ */
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  let intersection = 0;
+  for (const item of a) {
+    if (b.has(item)) intersection++;
+  }
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
 
-  if (normalizedA === normalizedB) {
-    return 20;
+/**
+ * Fuzzy Jaccard: for each token in A, find the best match in B
+ * using prefix matching (covers "tech" → "technology").
+ * Returns 0–1.
+ */
+function fuzzyJaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 || b.size === 0) return 0;
+
+  const bArr = Array.from(b);
+  let matches = 0;
+  const matched = new Set<string>();
+
+  for (const tokenA of a) {
+    let bestScore = 0;
+    let bestMatch = "";
+    for (const tokenB of bArr) {
+      if (matched.has(tokenB)) continue;
+      const score = tokenSimilarity(tokenA, tokenB);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = tokenB;
+      }
+    }
+    if (bestScore >= 0.6) {
+      matches++;
+      matched.add(bestMatch);
+    }
   }
 
-  const tokensA = new Set(normalizedA.split(" "));
-  const sharedTokens = normalizedB
-    .split(" ")
-    .filter((token) => tokensA.has(token));
-
-  return sharedTokens.length > 0 ? 10 : 0;
+  const union = a.size + b.size - matches;
+  return union === 0 ? 0 : matches / union;
 }
 
-function yearScore(yearA: string, yearB: string) {
+/**
+ * Similarity between two tokens:
+ * - Exact match → 1.0
+ * - One is a prefix of the other (min 3 chars) → 0.8
+ * - Edit distance ratio → 0–1
+ */
+function tokenSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  // Prefix match: "tech" matches "technology"
+  if (a.length >= 3 && b.startsWith(a)) return 0.85;
+  if (b.length >= 3 && a.startsWith(b)) return 0.85;
+  // Edit distance similarity
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1;
+  const dist = editDistance(a, b);
+  return 1 - dist / maxLen;
+}
+
+function editDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function subjectTokens(userId: string): Set<string> {
+  const subjects = getProfileSubjects(userId);
+  const tokens = new Set<string>();
+  for (const subject of subjects) {
+    for (const word of normalizeString(subject).split(/\s+/)) {
+      if (word.length > 0) tokens.add(word);
+    }
+  }
+  return tokens;
+}
+
+function yearSimilarity(yearA: string, yearB: string): number {
   const order = ["freshman", "sophomore", "junior", "senior", "grad"];
   const indexA = order.indexOf(yearA);
   const indexB = order.indexOf(yearB);
-
-  if (indexA < 0 || indexB < 0) {
-    return 0;
-  }
-
-  const distance = Math.abs(indexA - indexB);
-  if (distance === 0) {
-    return 15;
-  }
-  if (distance === 1) {
-    return 10;
-  }
-  if (distance === 2) {
-    return 5;
-  }
-  return 0;
+  if (indexA < 0 || indexB < 0) return 0;
+  return 1 - Math.abs(indexA - indexB) / 4;
 }
 
-function waitBonus(waitMs: number) {
-  return Math.min(15, Math.floor(waitMs / 30000));
+function waitSimilarity(queuedAt: string): number {
+  const waitMs = Date.now() - new Date(queuedAt).getTime();
+  return Math.min(1, waitMs / 180_000); // caps at 3 minutes
 }
+
+// ── Composite scoring ───────────────────────────────────
+
+interface MatchScore {
+  total: number;
+  sameCurrentSubject: boolean;
+  breakdown: {
+    currentSubject: number;
+    subjects: number;
+    school: number;
+    major: number;
+    year: number;
+    wait: number;
+  };
+}
+
+function computeMatchScore(
+  userId: string,
+  candidateId: string,
+  userQueueSubject: string,
+  candidateQueueSubject: string,
+  userQueuedAt: string,
+  candidateQueuedAt: string,
+): MatchScore | null {
+  const profileA = getProfile(userId);
+  const profileB = getProfile(candidateId);
+  if (!profileA || !profileB) return null;
+
+  const sameCurrentSubject =
+    normalizeString(userQueueSubject) === normalizeString(candidateQueueSubject);
+
+  const currentSubjectScore = sameCurrentSubject ? 1.0 : 0.0;
+
+  // Jaccard on all subject word tokens
+  const subjectsScore = jaccard(subjectTokens(userId), subjectTokens(candidateId));
+
+  // Fuzzy Jaccard on normalized school names
+  const schoolA = tokenize(profileA.normalizedSchool || profileA.school);
+  const schoolB = tokenize(profileB.normalizedSchool || profileB.school);
+  const schoolScore = fuzzyJaccard(schoolA, schoolB);
+
+  // Fuzzy Jaccard on normalized major names
+  const majorA = tokenize(profileA.normalizedMajor || profileA.major);
+  const majorB = tokenize(profileB.normalizedMajor || profileB.major);
+  const majorScore = fuzzyJaccard(majorA, majorB);
+
+  const yearScore = yearSimilarity(profileA.year, profileB.year);
+
+  // Average of both users' wait bonus
+  const waitScore =
+    (waitSimilarity(userQueuedAt) + waitSimilarity(candidateQueuedAt)) / 2;
+
+  const total =
+    WEIGHTS.currentSubject * currentSubjectScore +
+    WEIGHTS.subjects * subjectsScore +
+    WEIGHTS.school * schoolScore +
+    WEIGHTS.major * majorScore +
+    WEIGHTS.year * yearScore +
+    WEIGHTS.wait * waitScore;
+
+  return {
+    total,
+    sameCurrentSubject,
+    breakdown: {
+      currentSubject: currentSubjectScore,
+      subjects: subjectsScore,
+      school: schoolScore,
+      major: majorScore,
+      year: yearScore,
+      wait: waitScore,
+    },
+  };
+}
+
+// ── Match reason builder ────────────────────────────────
+
+function buildMatchReason(
+  userId: string,
+  partnerId: string,
+  currentSubject: string,
+  score: MatchScore,
+): string {
+  const partner = getProfile(partnerId);
+  if (!partner) return "You were matched based on your profiles.";
+
+  const parts: string[] = [];
+
+  if (score.breakdown.currentSubject === 1) {
+    parts.push(`You're both studying ${currentSubject} right now`);
+  }
+
+  if (score.breakdown.school >= 0.5) {
+    parts.push(`you both attend ${partner.normalizedSchool || partner.school}`);
+  }
+
+  if (score.breakdown.major >= 0.5 && !parts.some((p) => p.includes("studying"))) {
+    parts.push(`you share a similar major (${partner.normalizedMajor || partner.major})`);
+  } else if (score.breakdown.major >= 0.5) {
+    parts.push(`share a similar major`);
+  }
+
+  if (score.breakdown.subjects > 0.1 && score.breakdown.currentSubject < 1) {
+    const overlap = getOverlappingSubjectNames(userId, partnerId);
+    if (overlap.length > 0) {
+      parts.push(`you both study ${overlap.slice(0, 2).join(" and ")}`);
+    }
+  }
+
+  if (score.breakdown.year >= 0.75) {
+    parts.push(`you're in the same academic year`);
+  }
+
+  if (parts.length === 0) {
+    return `Matched with ${partner.name} — ${Math.round(score.total * 100)}% compatible.`;
+  }
+
+  // Capitalize first part, join with commas
+  parts[0] = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+  const reason = parts.join(", ") + `.`;
+  return `${reason} ${Math.round(score.total * 100)}% compatible.`;
+}
+
+function getOverlappingSubjectNames(userA: string, userB: string): string[] {
+  const subjectsA = getProfileSubjects(userA).map((s) => normalizeString(s));
+  const subjectsB = new Set(getProfileSubjects(userB).map((s) => normalizeString(s)));
+  const originalA = getProfileSubjects(userA);
+  const result: string[] = [];
+  for (let i = 0; i < subjectsA.length; i++) {
+    if (subjectsB.has(subjectsA[i])) {
+      result.push(originalA[i]);
+    }
+  }
+  return result;
+}
+
+// ── Partner profile builder ─────────────────────────────
 
 function buildPartnerProfile(userId: string): PartnerProfileSummary | null {
   const profile = getProfile(userId);
-  if (!profile) {
-    return null;
-  }
+  if (!profile) return null;
 
   return {
     userId,
@@ -81,130 +302,59 @@ function buildPartnerProfile(userId: string): PartnerProfileSummary | null {
   };
 }
 
-function buildMatchReason(
-  viewerId: string,
-  partnerId: string,
-  currentSubject: string,
-  matchType: "same_subject" | "expanded",
-) {
-  const viewer = getProfile(viewerId);
-  const partner = getProfile(partnerId);
-
-  if (!viewer || !partner) {
-    return matchType === "same_subject"
-      ? `You are both studying ${currentSubject} right now.`
-      : "No same-subject match was available, so we found the closest active student.";
-  }
-
-  if (matchType === "same_subject") {
-    return `You are both studying ${currentSubject} right now and attend ${partner.school}.`;
-  }
-
-  const overlap = getSubjectOverlap(viewerId, partnerId);
-  if (overlap.length > 0) {
-    return `No same-subject match was available, so we matched you with another ${partner.school} student who also studies ${overlap[0]}.`;
-  }
-
-  return `No same-subject match was available, so we matched you with another ${partner.school} student in a similar academic lane.`;
-}
+// ── Core matching logic ─────────────────────────────────
 
 export function findOrCreateMatch(userId: string): MatchStatusResponse {
   const queueEntry = getQueueEntry(userId);
   if (!queueEntry) {
-    return {
-      status: "idle",
-      matchId: null,
-      matchType: null,
-      reason: null,
-      partnerProfile: null,
-      queuedAt: null,
-      currentSubject: null,
-      sessionId: null,
-    };
+    return idle();
   }
 
   const profile = getProfile(userId);
   if (!profile || !isProfileComplete(userId) || getActiveSessionForUser(userId)) {
-    return {
-      status: "waiting",
-      matchId: null,
-      matchType: null,
-      reason: null,
-      partnerProfile: null,
-      queuedAt: queueEntry.queuedAt,
-      currentSubject: queueEntry.currentSubject,
-      sessionId: null,
-    };
+    return waiting(queueEntry.queuedAt, queueEntry.currentSubject);
   }
 
-  const waitedMs = getWaitDurationMs(queueEntry.queuedAt);
+  const waitedMs = Date.now() - new Date(queueEntry.queuedAt).getTime();
   const strictSubjectWindow = waitedMs < SUBJECT_STRICT_WINDOW_MS;
-  const candidates = listQueueEntries().filter((candidate) => {
-    if (candidate.userId === userId) {
-      return false;
-    }
-    if (!isProfileComplete(candidate.userId) || getActiveSessionForUser(candidate.userId)) {
-      return false;
-    }
+
+  const candidates = listQueueEntries().filter((c) => {
+    if (c.userId === userId) return false;
+    if (!isProfileComplete(c.userId) || getActiveSessionForUser(c.userId)) return false;
     if (strictSubjectWindow) {
-      return candidate.normalizedCurrentSubject === queueEntry.normalizedCurrentSubject;
+      return c.normalizedCurrentSubject === queueEntry.normalizedCurrentSubject;
     }
     return true;
   });
 
-  const ranked = candidates
-    .map((candidate) => {
-      const candidateProfile = getProfile(candidate.userId);
-      if (!candidateProfile) {
-        return null;
-      }
-
-      const sameSubject =
-        candidate.normalizedCurrentSubject === queueEntry.normalizedCurrentSubject;
-      const schoolScore =
-        normalizeString(candidateProfile.school) === normalizeString(profile.school)
-          ? 50
-          : 0;
-      const overlapCount = getSubjectOverlap(userId, candidate.userId).length;
-      const score =
-        (sameSubject ? 100 : 0) +
-        schoolScore +
-        majorSimilarity(profile.major, candidateProfile.major) +
-        yearScore(profile.year, candidateProfile.year) +
-        Math.min(24, overlapCount * 8) +
-        waitBonus(waitedMs) +
-        waitBonus(getWaitDurationMs(candidate.queuedAt));
-
-      return {
-        candidate,
-        score,
-        sameSubject,
-      };
+  const scored = candidates
+    .map((c) => {
+      const score = computeMatchScore(
+        userId,
+        c.userId,
+        queueEntry.currentSubject,
+        c.currentSubject,
+        queueEntry.queuedAt,
+        c.queuedAt,
+      );
+      return score ? { candidate: c, score } : null;
     })
-    .filter((value): value is NonNullable<typeof value> => Boolean(value))
-    .sort((a, b) => b.score - a.score);
+    .filter((v): v is NonNullable<typeof v> => v !== null)
+    .sort((a, b) => b.score.total - a.score.total);
 
-  const best = ranked[0];
-  if (!best || best.score < MINIMUM_MATCH_SCORE) {
-    return {
-      status: "waiting",
-      matchId: null,
-      matchType: null,
-      reason: null,
-      partnerProfile: null,
-      queuedAt: queueEntry.queuedAt,
-      currentSubject: queueEntry.currentSubject,
-      sessionId: null,
-    };
+  const best = scored[0];
+  if (!best || best.score.total < MINIMUM_MATCH_SCORE) {
+    return waiting(queueEntry.queuedAt, queueEntry.currentSubject);
   }
 
-  const matchType = best.sameSubject ? "same_subject" : "expanded";
+  const matchType = best.score.sameCurrentSubject ? "same_subject" : "expanded";
   const reason = buildMatchReason(
     userId,
     best.candidate.userId,
     queueEntry.currentSubject,
-    matchType,
+    best.score,
   );
+
   const match = createMatch(userId, best.candidate.userId, matchType, reason);
   const session = createSession(match.id);
 
@@ -246,18 +396,15 @@ export function getUserMatchStatus(userId: string): MatchStatusResponse {
   }
 
   if (queueEntry) {
-    return {
-      status: "waiting",
-      matchId: null,
-      matchType: null,
-      reason: null,
-      partnerProfile: null,
-      queuedAt: queueEntry.queuedAt,
-      currentSubject: queueEntry.currentSubject,
-      sessionId: null,
-    };
+    return waiting(queueEntry.queuedAt, queueEntry.currentSubject);
   }
 
+  return idle();
+}
+
+// ── Helpers ─────────────────────────────────────────────
+
+function idle(): MatchStatusResponse {
   return {
     status: "idle",
     matchId: null,
@@ -266,6 +413,19 @@ export function getUserMatchStatus(userId: string): MatchStatusResponse {
     partnerProfile: null,
     queuedAt: null,
     currentSubject: null,
+    sessionId: null,
+  };
+}
+
+function waiting(queuedAt: string, currentSubject: string): MatchStatusResponse {
+  return {
+    status: "waiting",
+    matchId: null,
+    matchType: null,
+    reason: null,
+    partnerProfile: null,
+    queuedAt,
+    currentSubject,
     sessionId: null,
   };
 }

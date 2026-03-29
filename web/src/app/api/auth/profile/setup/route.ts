@@ -8,6 +8,7 @@ import {
   isProfileComplete,
   upsertProfile,
 } from "@/lib/studybuddy/store";
+import { normalizeSchoolName, normalizeMajorName } from "@/lib/studybuddy/normalize";
 import { type AcademicYear } from "@/lib/studybuddy/types";
 
 function isAcademicYear(value: string): value is AcademicYear {
@@ -39,10 +40,18 @@ export async function POST(request: NextRequest) {
   const normalizedYear = isAcademicYear(year) ? year : "freshman";
   const subjectList = subjects.filter((subject): subject is string => typeof subject === "string");
 
+  // AI-normalize school and major in parallel (non-blocking, falls back gracefully)
+  const [normalizedSchool, normalizedMajor] = await Promise.all([
+    school ? normalizeSchoolName(school) : Promise.resolve(""),
+    major ? normalizeMajorName(major) : Promise.resolve(""),
+  ]);
+
   upsertProfile(user.id, {
     name,
     school,
+    normalizedSchool,
     major,
+    normalizedMajor,
     year: normalizedYear,
     bio,
     subjects: subjectList,

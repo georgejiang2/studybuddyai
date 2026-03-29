@@ -26,7 +26,9 @@ export interface Profile {
   userId: string;
   name: string;
   school: string;
+  normalizedSchool: string;
   major: string;
+  normalizedMajor: string;
   year: AcademicYear;
   bio: string;
   updatedAt: string;
@@ -90,7 +92,9 @@ export interface SessionMessageRecord {
 export interface ProfileSetupInput {
   name: string;
   school: string;
+  normalizedSchool?: string;
   major: string;
+  normalizedMajor?: string;
   year: AcademicYear;
   bio: string;
   subjects: string[];
