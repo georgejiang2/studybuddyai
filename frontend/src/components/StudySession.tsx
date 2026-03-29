@@ -57,7 +57,9 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
   const [chatOpen, setChatOpen] = useState(false);
   const [friendAdded, setFriendAdded] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const lastSeenCountRef = useRef(0);
+  const unreadCountRef = useRef(0);
+  const latestMessageAtRef = useRef<string | null>(null);
+  const lastSeenMessageAtRef = useRef<string | null>(null);
 
   const handleAddFriend = async () => {
     if (friendAdded) return;
@@ -79,19 +81,39 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
     onEnd();
   };
 
-  const handleNewMessages = useCallback((count: number) => {
-    if (!chatOpen && count > lastSeenCountRef.current) {
-      setUnreadCount(count - lastSeenCountRef.current);
+  const handleNewMessages = useCallback((messages: SessionMessage[]) => {
+    const latestMessageAt = messages.length > 0 ? messages[messages.length - 1].createdAt : null;
+    latestMessageAtRef.current = latestMessageAt;
+
+    if (chatOpen) {
+      if (latestMessageAt) {
+        lastSeenMessageAtRef.current = latestMessageAt;
+      }
+      unreadCountRef.current = 0;
+      setUnreadCount(0);
+      return;
+    }
+
+    const unreadIncoming = messages.filter(
+      (message) =>
+        message.senderId === sessionPayload.partnerId
+        && (!lastSeenMessageAtRef.current || message.createdAt > lastSeenMessageAtRef.current),
+    ).length;
+
+    if (unreadIncoming > unreadCountRef.current) {
       playPing();
     }
-    if (chatOpen) {
-      lastSeenCountRef.current = count;
-      setUnreadCount(0);
-    }
-  }, [chatOpen]);
+
+    unreadCountRef.current = unreadIncoming;
+    setUnreadCount(unreadIncoming);
+  }, [chatOpen, sessionPayload.partnerId]);
 
   const handleChatToggle = () => {
     if (!chatOpen) {
+      if (latestMessageAtRef.current) {
+        lastSeenMessageAtRef.current = latestMessageAtRef.current;
+      }
+      unreadCountRef.current = 0;
       setUnreadCount(0);
     }
     setChatOpen(!chatOpen);
@@ -155,7 +177,7 @@ function FallbackSession({
   chatOpen: boolean;
   onChatToggle: () => void;
   unreadCount: number;
-  onNewMessages: (count: number) => void;
+  onNewMessages: (messages: SessionMessage[]) => void;
   friendAdded: boolean;
   onAddFriend: () => void;
   onEnd: () => void;
@@ -276,7 +298,7 @@ function SessionContent({
   chatOpen: boolean;
   onChatToggle: () => void;
   unreadCount: number;
-  onNewMessages: (count: number) => void;
+  onNewMessages: (messages: SessionMessage[]) => void;
   friendAdded: boolean;
   onAddFriend: () => void;
   onEnd: () => void;
@@ -522,7 +544,7 @@ function ChatPanel({
 }: {
   sessionId: string;
   onClose: () => void;
-  onMessageCount: (count: number) => void;
+  onMessageCount: (messages: SessionMessage[]) => void;
 }) {
   const [messages, setMessages] = useState<SessionMessage[]>([]);
   const [input, setInput] = useState('');
@@ -534,7 +556,7 @@ function ChatPanel({
     try {
       const res = await api.getSessionMessages(sessionId);
       setMessages(res.messages);
-      onMessageCount(res.messages.length);
+      onMessageCount(res.messages);
     } catch {
       // ignore
     }

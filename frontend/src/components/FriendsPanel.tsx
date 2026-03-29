@@ -4,11 +4,37 @@ import { api, type Friendship, type FriendMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import styles from './FriendsPanel.module.css';
 
+function getUnreadStorageKey(userId: string) {
+  return `studybuddy.friend-last-read.${userId}`;
+}
+
+function readLastReadMap(userId: string): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(getUnreadStorageKey(userId));
+    return raw ? JSON.parse(raw) as Record<string, string> : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLastReadMap(userId: string, value: Record<string, string>) {
+  try {
+    localStorage.setItem(getUnreadStorageKey(userId), JSON.stringify(value));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function getPartnerId(friendship: Friendship, userId: string) {
+  return friendship.requesterId === userId ? friendship.recipientId : friendship.requesterId;
+}
+
 export default function FriendsPanel() {
   const { user } = useAuth();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<Friendship | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unreadByFriendship, setUnreadByFriendship] = useState<Record<string, number>>({});
 
   const fetchFriends = useCallback(async () => {
     try {
@@ -43,16 +69,33 @@ export default function FriendsPanel() {
     }
   };
 
+  const markConversationRead = useCallback((friendshipId: string, latestMessageAt?: string) => {
+    if (!user || !latestMessageAt) return;
+
+    setUnreadByFriendship((prev) => {
+      if (!prev[friendshipId]) return prev;
+      return { ...prev, [friendshipId]: 0 };
+    });
+
+    const next = {
+      ...readLastReadMap(user.id),
+      [friendshipId]: latestMessageAt,
+    };
+    writeLastReadMap(user.id, next);
+  }, [user]);
+
   if (selectedFriend && user) {
-    const partnerId = selectedFriend.requesterId === user.id
-      ? selectedFriend.recipientId
-      : selectedFriend.requesterId;
+    const partnerId = getPartnerId(selectedFriend, user.id);
     const partnerName = selectedFriend.partnerProfile?.name ?? 'Friend';
     return (
       <FriendChat
+        friendshipId={selectedFriend.id}
         friendId={partnerId}
         friendName={partnerName}
         onBack={() => setSelectedFriend(null)}
+        onMessagesSeen={(latestMessageAt) => {
+          markConversationRead(selectedFriend.id, latestMessageAt);
+        }}
       />
     );
   }
@@ -64,6 +107,46 @@ export default function FriendsPanel() {
   const pendingOutgoing = friends.filter(
     (f) => f.status === 'pending' && f.requesterId === user?.id,
   );
+
+  const fetchUnreadCounts = useCallback(async (acceptedFriends: Friendship[]) => {
+    if (!user || acceptedFriends.length === 0) {
+      setUnreadByFriendship({});
+      return;
+    }
+
+    const readMap = readLastReadMap(user.id);
+
+    try {
+      const results = await Promise.all(
+        acceptedFriends.map(async (friendship) => {
+          const partnerId = getPartnerId(friendship, user.id);
+          const res = await api.getFriendChat(partnerId);
+          const lastReadAt = readMap[friendship.id];
+          const unreadCount = res.messages.filter(
+            (message) =>
+              message.senderId !== user.id
+              && (!lastReadAt || message.createdAt > lastReadAt),
+          ).length;
+          return [friendship.id, unreadCount] as const;
+        }),
+      );
+
+      setUnreadByFriendship(Object.fromEntries(results));
+    } catch {
+      // ignore
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchUnreadCounts(accepted);
+    const interval = setInterval(() => {
+      fetchUnreadCounts(accepted);
+    }, 10000);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [accepted, fetchUnreadCounts, user]);
 
   return (
     <div className={styles.panel}>
@@ -137,7 +220,14 @@ export default function FriendsPanel() {
                       {f.partnerProfile?.school} &middot; {f.partnerProfile?.major}
                     </span>
                   </div>
-                  <MessageCircle size={16} className={styles.chatIcon} />
+                  <div className={styles.friendAction}>
+                    <MessageCircle size={16} className={styles.chatIcon} />
+                    {unreadByFriendship[f.id] > 0 && (
+                      <span className={styles.unreadBadge}>
+                        {unreadByFriendship[f.id] > 9 ? '9+' : unreadByFriendship[f.id]}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -169,13 +259,17 @@ export default function FriendsPanel() {
 }
 
 function FriendChat({
+  friendshipId,
   friendId,
   friendName,
   onBack,
+  onMessagesSeen,
 }: {
+  friendshipId: string;
   friendId: string;
   friendName: string;
   onBack: () => void;
+  onMessagesSeen: (latestMessageAt?: string) => void;
 }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<FriendMessage[]>([]);
@@ -188,10 +282,11 @@ function FriendChat({
     try {
       const res = await api.getFriendChat(friendId);
       setMessages(res.messages);
+      onMessagesSeen(res.messages.length > 0 ? res.messages[res.messages.length - 1].createdAt : undefined);
     } catch {
       // ignore
     }
-  }, [friendId]);
+  }, [friendId, onMessagesSeen]);
 
   useEffect(() => {
     fetchMessages();
@@ -204,6 +299,11 @@ function FriendChat({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    onMessagesSeen(messages[messages.length - 1].createdAt);
+  }, [messages, onMessagesSeen, friendshipId]);
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
