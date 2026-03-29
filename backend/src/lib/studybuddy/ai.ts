@@ -1,5 +1,5 @@
 /**
- * AI-powered study style classifier using Claude API.
+ * AI-powered study style classifier using Groq API (Llama 3.1).
  *
  * Analyzes a student's bio text and classifies them into 1–3 study styles
  * from a fixed taxonomy. These styles are used as an additional signal
@@ -7,73 +7,73 @@
  * get paired together.
  */
 
-// The canonical set of study styles. Claude must pick from these exactly.
 export const STUDY_STYLES = [
-  "focused",       // Deep work, quiet study, minimal distractions, solo grinder
-  "collaborative", // Group projects, shared notes, teamwork-oriented
-  "social",        // Enjoys discussion, study groups, learning through conversation
-  "competitive",   // Exam prep, grade-driven, accountability partner
-  "casual",        // Relaxed pace, flexible schedule, low-pressure environment
-  "teaching",      // Likes explaining concepts, tutoring, mentoring others
-  "visual",        // Diagrams, whiteboards, video-based learning
-  "cramming",      // Last-minute sessions, high-intensity short bursts
+  "focused",
+  "collaborative",
+  "social",
+  "competitive",
+  "casual",
+  "teaching",
+  "visual",
+  "cramming",
 ] as const;
 
 export type StudyStyle = (typeof STUDY_STYLES)[number];
 
-interface ClaudeMessage {
-  role: "user" | "assistant";
-  content: string;
+interface GroqChoice {
+  message: { role: string; content: string };
 }
 
-interface ClaudeResponse {
-  content: Array<{ type: string; text?: string }>;
+interface GroqResponse {
+  choices?: GroqChoice[];
+  error?: { message: string };
 }
 
-/**
- * Calls the Claude API (Anthropic Messages endpoint) directly via fetch.
- * Uses claude-3-5-haiku for speed and cost-efficiency.
- */
-async function callClaude(messages: ClaudeMessage[], system: string): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+async function callGroq(system: string, userMsg: string): Promise<string> {
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not set");
+    throw new Error("GROQ_API_KEY is not set");
   }
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "claude-3-5-haiku-20241022",
-      max_tokens: 100,
-      system,
-      messages,
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg },
+      ],
+      max_tokens: 50,
+      temperature: 0.1,
     }),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "unknown error");
-    throw new Error(`Claude API error (${res.status}): ${errText}`);
+    throw new Error(`Groq API error (${res.status}): ${errText}`);
   }
 
-  const data = (await res.json()) as ClaudeResponse;
-  const textBlock = data.content.find((b) => b.type === "text");
-  return textBlock?.text?.trim() ?? "";
+  const data = (await res.json()) as GroqResponse;
+  if (data.error) {
+    throw new Error(`Groq API error: ${data.error.message}`);
+  }
+
+  return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
 /**
- * Classifies a student's bio into 1–3 study styles using Claude.
+ * Classifies a student's bio into 1–3 study styles using Groq (Llama 3.1).
  *
  * Returns an array of StudyStyle strings. If the API fails or the bio
  * is empty, returns a sensible default so matching still works.
  */
 export async function classifyStudyStyles(bio: string, major?: string, year?: string): Promise<StudyStyle[]> {
   if (!bio || bio.trim().length < 3) {
-    return ["collaborative"]; // safe default
+    return ["collaborative"];
   }
 
   const styleList = STUDY_STYLES.join(", ");
@@ -87,12 +87,8 @@ Return ONLY a comma-separated list of style names from the list. Nothing else.`;
   const userMsg = `Bio: "${bio}"${major ? `\nMajor: ${major}` : ""}${year ? `\nYear: ${year}` : ""}`;
 
   try {
-    const response = await callClaude(
-      [{ role: "user", content: userMsg }],
-      system,
-    );
+    const response = await callGroq(system, userMsg);
 
-    // Parse the response: expect comma-separated style names
     const parsed = response
       .toLowerCase()
       .split(",")
@@ -100,13 +96,13 @@ Return ONLY a comma-separated list of style names from the list. Nothing else.`;
       .filter((s): s is StudyStyle => (STUDY_STYLES as readonly string[]).includes(s));
 
     if (parsed.length === 0) {
-      console.warn("[AI] Claude returned no valid styles from:", response);
+      console.warn("[AI] Groq returned no valid styles from:", response);
       return ["collaborative"];
     }
 
-    return parsed.slice(0, 3); // cap at 3
+    return parsed.slice(0, 3);
   } catch (err) {
     console.error("[AI] Failed to classify study styles:", err);
-    return ["collaborative"]; // graceful fallback
+    return ["collaborative"];
   }
 }
