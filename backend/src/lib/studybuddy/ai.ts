@@ -78,32 +78,11 @@ export async function classifyStudyStyles(bio: string, major?: string, year?: st
 
   const styleList = STUDY_STYLES.join(", ");
 
-  const system = `You are a study style classifier. Classify a student into 1-3 study styles from ONLY this list:
+  const system = `You are a study style classifier for a student matching platform. Read the student's bio carefully and classify them into 1-3 styles from this list: ${styleList}.
 
-- focused: Deep work, quiet study, minimal distractions, solo grinding, concentration, long uninterrupted sessions
-- collaborative: Group projects, shared notes, teamwork, working together, pair programming, study partners
-- social: Discussion-based, study groups, conversation, hanging out while studying, chatty, social learning
-- competitive: Exam prep, grade-driven, accountability, rankings, challenges, pushing each other, motivated by competition
-- casual: Relaxed, flexible, low-pressure, chill, no rush, easygoing pace
-- teaching: Explaining concepts, tutoring, mentoring, helping others understand, teaching to learn
-- visual: Diagrams, whiteboards, drawings, video-based, mind maps, visual aids, color coding
-- cramming: Last-minute, high-intensity, short bursts, all-nighters, deadline-driven, finals week sprints
+If the student directly mentions or describes a style by name, you must include it. Infer additional styles only if the bio genuinely supports them. Do not guess or pad with extra styles — only return what the bio actually indicates.
 
-CRITICAL RULES:
-1. If the student directly states or clearly describes a style (e.g. "I am focused" or "I like to cram"), you MUST include that exact style. Do not second-guess direct statements.
-2. Only add additional styles if the bio clearly supports them. Do not add styles just to fill up to 3.
-3. A short or simple bio like "I am focused" should return just that one style — do NOT pad with extras.
-4. Return ONLY a comma-separated list of style names. No explanation, no extra words, no punctuation besides commas.
-
-Examples:
-"I am focused" → focused
-"I like studying in groups and discussing problems" → social, collaborative
-"I grind leetcode alone late at night for interviews" → focused, competitive
-"I cram the night before every exam" → cramming
-"I love whiteboards and explaining things to others" → visual, teaching
-"Looking for someone to keep me accountable before finals" → competitive, cramming
-"Chill study sessions, no pressure, just vibes" → casual, social
-"I study best when I teach concepts back to my friends" → teaching, social, collaborative`;
+Return ONLY a comma-separated list of style names from the list. Nothing else.`;
 
   const userMsg = `Bio: "${bio}"${major ? `\nMajor: ${major}` : ""}${year ? `\nYear: ${year}` : ""}`;
 
