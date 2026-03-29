@@ -66,6 +66,7 @@ export interface ProfileSetupPayload {
   year: string;
   bio: string;
   subjects: string[];
+  studyStyles?: string[];
 }
 
 export interface MatchStatus {
@@ -158,7 +159,7 @@ export const api = {
   },
 
   setupProfile(data: ProfileSetupPayload) {
-    return request<{ user: AuthUser; profile: Profile; subjects: string[]; profileCompleted: boolean }>(
+    return request<{ user: AuthUser; profile: Profile; subjects: string[]; studyStyles: string[]; profileCompleted: boolean }>(
       '/api/auth/profile/setup',
       { method: 'POST', body: JSON.stringify(data) },
     );

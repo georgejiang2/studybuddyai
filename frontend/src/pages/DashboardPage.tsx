@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
-import { BookOpen, LogOut, Video, Users, Home, Pencil, X, Plus, Trash2, Phone, PhoneOff } from 'lucide-react';
+import { BookOpen, LogOut, Video, Users, Home, User, Plus, Trash2, Phone, PhoneOff } from 'lucide-react';
 import Autocomplete from '../components/Autocomplete';
 import schools from '../data/schools.json';
 import majors from '../data/majors.json';
@@ -11,7 +11,12 @@ import StudySession from '../components/StudySession';
 import FriendsPanel from '../components/FriendsPanel';
 import styles from './DashboardPage.module.css';
 
-type View = 'home' | 'searching' | 'session' | 'friends';
+type View = 'home' | 'searching' | 'session' | 'friends' | 'profile';
+
+const ALL_STUDY_STYLES = [
+  'focused', 'collaborative', 'social', 'competitive',
+  'casual', 'teaching', 'visual', 'cramming',
+] as const;
 
 export default function DashboardPage() {
   const { user, meData, logout, refresh } = useAuth();
@@ -270,6 +275,13 @@ export default function DashboardPage() {
                   <span className={styles.tabBadge}>{pendingFriendCount}</span>
                 )}
               </button>
+              <button
+                className={`${styles.tab} ${view === 'profile' ? styles.tabActive : ''}`}
+                onClick={() => setView('profile')}
+              >
+                <User size={16} />
+                Profile
+              </button>
             </div>
           )}
 
@@ -294,8 +306,20 @@ export default function DashboardPage() {
         <main className={styles.friendsMain}>
           <FriendsPanel onCallAccepted={handleCallAccepted} />
         </main>
-      ) : (
+      ) : view === 'profile' ? (
         <main className={styles.main}>
+          <div className={styles.content}>
+            <ProfilePage
+              profile={profile}
+              email={user?.email ?? ''}
+              subjects={subjects}
+              studyStyles={studyStyles}
+              onSaved={refresh}
+            />
+          </div>
+        </main>
+      ) : (
+        <main className={styles.mainCentered}>
           <div className={styles.content}>
             {!profileDone ? (
               <ProfileSetup key={profile?.name ?? ''} onDone={refresh} existingProfile={profile} existingSubjects={subjects} />
@@ -329,12 +353,10 @@ export default function DashboardPage() {
                   </div>
 
                   <div className={styles.homeRight}>
-                    <ProfileEditor
+                    <ProfileSummary
                       profile={profile}
-                      email={user?.email ?? ''}
                       subjects={subjects}
                       studyStyles={studyStyles}
-                      onSaved={refresh}
                     />
                   </div>
                 </div>
@@ -439,160 +461,27 @@ function ProfileSetup({ onDone, existingProfile, existingSubjects }: {
   );
 }
 
-function ProfileEditor({
+/** Read-only profile summary for the home page (no email, no edit) */
+function ProfileSummary({
   profile,
-  email,
   subjects,
   studyStyles,
-  onSaved,
 }: {
   profile: import('../api/client').Profile | null | undefined;
-  email: string;
   subjects: string[];
   studyStyles: string[];
-  onSaved: () => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [school, setSchool] = useState(profile?.school ?? '');
-  const [major, setMajor] = useState(profile?.major ?? '');
-  const [year, setYear] = useState(profile?.year ?? '');
-  const [bio, setBio] = useState(profile?.bio ?? '');
-  const [editSubjects, setEditSubjects] = useState<string[]>(subjects);
-  const [newSubject, setNewSubject] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const startEditing = () => {
-    setSchool(profile?.school ?? '');
-    setMajor(profile?.major ?? '');
-    setYear(profile?.year ?? '');
-    setBio(profile?.bio ?? '');
-    setEditSubjects([...subjects]);
-    setNewSubject('');
-    setError('');
-    setEditing(true);
-  };
-
-  const addSubject = () => {
-    const trimmed = newSubject.trim();
-    if (!trimmed) return;
-    if (editSubjects.some((s) => s.toLowerCase() === trimmed.toLowerCase())) return;
-    setEditSubjects([...editSubjects, trimmed]);
-    setNewSubject('');
-  };
-
-  const removeSubject = (index: number) => {
-    setEditSubjects(editSubjects.filter((_, i) => i !== index));
-  };
-
-  const handleSave = async () => {
-    if (editSubjects.length === 0) {
-      setError('You need at least one subject.');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      await api.setupProfile({
-        name: profile?.name ?? '',
-        school,
-        major,
-        year,
-        bio,
-        subjects: editSubjects,
-      });
-      await onSaved();
-      setEditing(false);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to save.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (editing) {
-    return (
-      <div className={styles.info}>
-        <div className={styles.infoHeader}>
-          <span className={styles.infoHeaderText}>Edit Profile</span>
-          <button className={styles.editClose} onClick={() => setEditing(false)}>
-            <X size={16} />
-          </button>
-        </div>
-        {error && <div className={styles.editError}>{error}</div>}
-        <div className={styles.editFields}>
-          <div className={styles.editField}>
-            <label>School</label>
-            <Autocomplete options={schools} value={school} onChange={setSchool} placeholder="Search your school..." />
-          </div>
-          <div className={styles.editField}>
-            <label>Major</label>
-            <Autocomplete options={majors} value={major} onChange={setMajor} placeholder="Search your major..." />
-          </div>
-          <div className={styles.editField}>
-            <label>Year</label>
-            <select value={year} onChange={(e) => setYear(e.target.value)}>
-              <option value="freshman">Freshman</option>
-              <option value="sophomore">Sophomore</option>
-              <option value="junior">Junior</option>
-              <option value="senior">Senior</option>
-              <option value="grad">Grad</option>
-            </select>
-          </div>
-          <div className={styles.editField}>
-            <label>Bio</label>
-            <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={2} />
-          </div>
-          <div className={styles.editField}>
-            <label>Subjects</label>
-            <div className={styles.subjectList}>
-              {editSubjects.map((s, i) => (
-                <span key={i} className={styles.subjectTag}>
-                  {s}
-                  <button type="button" onClick={() => removeSubject(i)} className={styles.removeSubject}>
-                    <Trash2 size={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className={styles.addSubjectRow}>
-              <input
-                value={newSubject}
-                onChange={(e) => setNewSubject(e.target.value)}
-                placeholder="Add a subject..."
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubject(); } }}
-              />
-              <button type="button" onClick={addSubject} className={styles.addSubjectBtn} disabled={!newSubject.trim()}>
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className={styles.editActions}>
-          <button className={styles.startBtn} onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save changes'}
-          </button>
-          <button className={styles.secondaryBtn} onClick={() => setEditing(false)}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.info}>
       <div className={styles.infoHeader}>
         <span className={styles.infoHeaderText}>Your Profile</span>
-        <button className={styles.editBtn} onClick={startEditing}>
-          <Pencil size={14} />
-          Edit
-        </button>
       </div>
-      <div className={styles.infoItem}>
-        <span className={styles.infoLabel}>Email</span>
-        <span className={styles.infoValue}>{email}</span>
-      </div>
+      {profile?.name && (
+        <div className={styles.infoItem}>
+          <span className={styles.infoLabel}>Name</span>
+          <span className={styles.infoValue}>{profile.name}</span>
+        </div>
+      )}
       {profile?.school && (
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>School</span>
@@ -636,4 +525,212 @@ function ProfileEditor({
       )}
     </div>
   );
+}
+
+/** Full profile editing page */
+function ProfilePage({
+  profile,
+  email,
+  subjects,
+  studyStyles,
+  onSaved,
+}: {
+  profile: import('../api/client').Profile | null | undefined;
+  email: string;
+  subjects: string[];
+  studyStyles: string[];
+  onSaved: () => Promise<void>;
+}) {
+  const [name, setName] = useState(profile?.name ?? '');
+  const [school, setSchool] = useState(profile?.school ?? '');
+  const [major, setMajor] = useState(profile?.major ?? '');
+  const [year, setYear] = useState(profile?.year ?? '');
+  const [bio, setBio] = useState(profile?.bio ?? '');
+  const [editSubjects, setEditSubjects] = useState<string[]>(subjects);
+  const [newSubject, setNewSubject] = useState('');
+  const [selectedStyles, setSelectedStyles] = useState<string[]>(studyStyles);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const addSubject = () => {
+    const trimmed = newSubject.trim();
+    if (!trimmed) return;
+    if (editSubjects.some((s) => s.toLowerCase() === trimmed.toLowerCase())) return;
+    setEditSubjects([...editSubjects, trimmed]);
+    setNewSubject('');
+  };
+
+  const removeSubject = (index: number) => {
+    setEditSubjects(editSubjects.filter((_, i) => i !== index));
+  };
+
+  const toggleStyle = (style: string) => {
+    if (selectedStyles.includes(style)) {
+      setSelectedStyles(selectedStyles.filter((s) => s !== style));
+    } else if (selectedStyles.length < 3) {
+      setSelectedStyles([...selectedStyles, style]);
+    }
+  };
+
+  const handleSave = async () => {
+    if (editSubjects.length === 0) {
+      setError('You need at least one subject.');
+      return;
+    }
+    if (!name.trim()) {
+      setError('Name is required.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setSuccess(false);
+    try {
+      await api.setupProfile({
+        name: name.trim(),
+        school,
+        major,
+        year,
+        bio,
+        subjects: editSubjects,
+        studyStyles: selectedStyles,
+      });
+      await onSaved();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={styles.profilePage}>
+      <h1 className={styles.profileTitle}>Profile</h1>
+      <p className={styles.profileSub}>Manage your profile information and study preferences.</p>
+
+      {error && <div className={styles.editError}>{error}</div>}
+      {success && <div className={styles.successMsg}>Profile saved!</div>}
+
+      <div className={styles.profileSections}>
+        <div className={styles.profileSection}>
+          <h3 className={styles.sectionLabel}>Personal Info</h3>
+          <div className={styles.editFields}>
+            <div className={styles.editField}>
+              <label>Name</label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+            </div>
+            <div className={styles.editField}>
+              <label>Email</label>
+              <input type="text" value={email} disabled className={styles.disabledInput} />
+            </div>
+            <div className={styles.editField}>
+              <label>School</label>
+              <Autocomplete options={schools} value={school} onChange={setSchool} placeholder="Search your school..." />
+            </div>
+            <div className={styles.editField}>
+              <label>Major</label>
+              <Autocomplete options={majors} value={major} onChange={setMajor} placeholder="Search your major..." />
+            </div>
+            <div className={styles.editField}>
+              <label>Year</label>
+              <select value={year} onChange={(e) => setYear(e.target.value)}>
+                <option value="freshman">Freshman</option>
+                <option value="sophomore">Sophomore</option>
+                <option value="junior">Junior</option>
+                <option value="senior">Senior</option>
+                <option value="grad">Grad</option>
+              </select>
+            </div>
+            <div className={styles.editField}>
+              <label>Bio</label>
+              <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} placeholder="Tell others about your study habits..." />
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.profileSection}>
+          <h3 className={styles.sectionLabel}>Subjects</h3>
+          <div className={styles.subjectList}>
+            {editSubjects.map((s, i) => (
+              <span key={i} className={styles.subjectTag}>
+                {s}
+                <button type="button" onClick={() => removeSubject(i)} className={styles.removeSubject}>
+                  <Trash2 size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className={styles.addSubjectRow}>
+            <input
+              value={newSubject}
+              onChange={(e) => setNewSubject(e.target.value)}
+              placeholder="Add a subject..."
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubject(); } }}
+            />
+            <button type="button" onClick={addSubject} className={styles.addSubjectBtn} disabled={!newSubject.trim()}>
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.profileSection}>
+          <h3 className={styles.sectionLabel}>Study Style</h3>
+          <p className={styles.sectionHint}>
+            Pick up to 3 styles that describe how you like to study. This helps us match you with compatible partners.
+            {selectedStyles.length > 0 ? '' : ' Your style is also auto-detected from your bio.'}
+          </p>
+          <div className={styles.styleGrid}>
+            {ALL_STUDY_STYLES.map((style) => (
+              <button
+                key={style}
+                type="button"
+                className={`${styles.styleOption} ${selectedStyles.includes(style) ? styles.styleSelected : ''}`}
+                onClick={() => toggleStyle(style)}
+              >
+                <span className={styles.styleEmoji}>{styleEmoji(style)}</span>
+                <span className={styles.styleName}>{style.charAt(0).toUpperCase() + style.slice(1)}</span>
+                <span className={styles.styleDesc}>{styleDescription(style)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.profileActions}>
+        <button className={styles.startBtn} onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save changes'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function styleEmoji(style: string): string {
+  const map: Record<string, string> = {
+    focused: '\u{1F3AF}',
+    collaborative: '\u{1F91D}',
+    social: '\u{1F4AC}',
+    competitive: '\u{1F3C6}',
+    casual: '\u{2615}',
+    teaching: '\u{1F4DA}',
+    visual: '\u{1F3A8}',
+    cramming: '\u{26A1}',
+  };
+  return map[style] ?? '';
+}
+
+function styleDescription(style: string): string {
+  const map: Record<string, string> = {
+    focused: 'Deep work, minimal distractions',
+    collaborative: 'Shared notes, teamwork',
+    social: 'Discussion-based learning',
+    competitive: 'Exam prep, accountability',
+    casual: 'Relaxed pace, low pressure',
+    teaching: 'Explaining concepts, mentoring',
+    visual: 'Diagrams, whiteboards',
+    cramming: 'Last-minute, high intensity',
+  };
+  return map[style] ?? '';
 }

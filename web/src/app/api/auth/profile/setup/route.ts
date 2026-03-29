@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
   const year = typeof body.year === "string" ? body.year.trim().toLowerCase() : "";
   const bio = typeof body.bio === "string" ? body.bio.trim() : "";
   const subjects: unknown[] = Array.isArray(body.subjects) ? body.subjects : [];
+  const userStudyStyles: unknown[] = Array.isArray(body.studyStyles) ? body.studyStyles : [];
 
   if (!name) {
     return badRequest("Name is required.");
@@ -41,6 +42,12 @@ export async function POST(request: NextRequest) {
 
   const normalizedYear = isAcademicYear(year) ? year : "freshman";
   const subjectList = subjects.filter((subject): subject is string => typeof subject === "string");
+
+  // Validate user-provided study styles
+  const validStyles = ["focused", "collaborative", "social", "competitive", "casual", "teaching", "visual", "cramming"];
+  const userStyleList = userStudyStyles
+    .filter((s): s is string => typeof s === "string" && validStyles.includes(s))
+    .slice(0, 3);
 
   await upsertProfile(user.id, {
     name,
@@ -51,14 +58,17 @@ export async function POST(request: NextRequest) {
     subjects: subjectList,
   });
 
-  // AI-powered study style classification (runs async, non-blocking for response)
-  // We fire it and await it so the styles are ready for matching
-  try {
-    const styles = await classifyStudyStyles(bio, major, normalizedYear);
-    await upsertStudyStyles(user.id, styles);
-  } catch {
-    // If AI fails, matching still works without study styles
-    console.error("[AI] Study style classification failed for user", user.id);
+  // If user explicitly selected study styles, use those; otherwise auto-classify from bio
+  if (userStyleList.length > 0) {
+    await upsertStudyStyles(user.id, userStyleList);
+  } else {
+    try {
+      const styles = await classifyStudyStyles(bio, major, normalizedYear);
+      await upsertStudyStyles(user.id, styles);
+    } catch {
+      // If AI fails, matching still works without study styles
+      console.error("[AI] Study style classification failed for user", user.id);
+    }
   }
 
   return ok({
