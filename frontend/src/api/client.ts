@@ -195,6 +195,12 @@ export const api = {
     });
   },
 
+  getSessionStatus(sessionId: string) {
+    return request<{ status: string; endReason: string | null; endedBy: string | null; skippedByPartner: boolean }>(
+      `/api/session/status?sessionId=${sessionId}`,
+    );
+  },
+
   skipSession(sessionId: string) {
     return request<{ session: unknown }>('/api/session/skip', {
       method: 'POST',

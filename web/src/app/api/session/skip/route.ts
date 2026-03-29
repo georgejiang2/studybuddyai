@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
   const partnerId = getPartnerUserId(match, user.id);
   await recordSkip(user.id, partnerId);
 
-  // End the session
-  const ended = await endSession(sessionId);
+  // End the session with skip reason
+  const ended = await endSession(sessionId, "skipped", user.id);
   await endCallBySessionId(sessionId);
 
   return ok({ session: ended });

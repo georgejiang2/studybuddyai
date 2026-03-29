@@ -243,59 +243,51 @@ export async function createSession(matchId: string): Promise<SessionRecord> {
     "INSERT INTO sessions (id, match_id, room_name, provider, provider_room_id, status, created_at) VALUES ($1,$2,$3,'livekit',$2,'active',$4)",
     [id, matchId, roomName, now],
   );
-  return { id, matchId, roomName, provider: "livekit", providerRoomId: matchId, status: "active", createdAt: now };
+  return { id, matchId, roomName, provider: "livekit", providerRoomId: matchId, status: "active", endReason: null, endedBy: null, createdAt: now };
+}
+
+type SessionRow = {
+  id: string; match_id: string; room_name: string; provider: string;
+  provider_room_id: string; status: string; end_reason: string | null;
+  ended_by: string | null; created_at: string;
+};
+
+function mapSessionRow(row: SessionRow): SessionRecord {
+  return {
+    id: row.id, matchId: row.match_id, roomName: row.room_name,
+    provider: "livekit", providerRoomId: row.provider_room_id,
+    status: row.status as SessionRecord["status"],
+    endReason: row.end_reason ?? null, endedBy: row.ended_by ?? null,
+    createdAt: row.created_at,
+  };
 }
 
 export async function getSession(sessionId: string): Promise<SessionRecord | null> {
-  const res = await query<{
-    id: string; match_id: string; room_name: string; provider: string;
-    provider_room_id: string; status: string; created_at: string;
-  }>("SELECT * FROM sessions WHERE id = $1", [sessionId]);
-  const row = res.rows[0];
-  if (!row) return null;
-  return {
-    id: row.id, matchId: row.match_id, roomName: row.room_name,
-    provider: "livekit", providerRoomId: row.provider_room_id,
-    status: row.status as SessionRecord["status"], createdAt: row.created_at,
-  };
+  const res = await query<SessionRow>("SELECT * FROM sessions WHERE id = $1", [sessionId]);
+  return res.rows[0] ? mapSessionRow(res.rows[0]) : null;
 }
 
 export async function getSessionByMatchId(matchId: string): Promise<SessionRecord | null> {
-  const res = await query<{
-    id: string; match_id: string; room_name: string; provider: string;
-    provider_room_id: string; status: string; created_at: string;
-  }>("SELECT * FROM sessions WHERE match_id = $1 AND status = 'active' LIMIT 1", [matchId]);
-  const row = res.rows[0];
-  if (!row) return null;
-  return {
-    id: row.id, matchId: row.match_id, roomName: row.room_name,
-    provider: "livekit", providerRoomId: row.provider_room_id,
-    status: row.status as SessionRecord["status"], createdAt: row.created_at,
-  };
+  const res = await query<SessionRow>("SELECT * FROM sessions WHERE match_id = $1 AND status = 'active' LIMIT 1", [matchId]);
+  return res.rows[0] ? mapSessionRow(res.rows[0]) : null;
 }
 
 export async function getActiveSessionForUser(userId: string): Promise<SessionRecord | null> {
-  const res = await query<{
-    id: string; match_id: string; room_name: string; provider: string;
-    provider_room_id: string; status: string; created_at: string;
-  }>(
+  const res = await query<SessionRow>(
     `SELECT s.* FROM sessions s
      JOIN matches m ON s.match_id = m.id
      WHERE s.status = 'active' AND (m.user_a = $1 OR m.user_b = $1)
      LIMIT 1`,
     [userId],
   );
-  const row = res.rows[0];
-  if (!row) return null;
-  return {
-    id: row.id, matchId: row.match_id, roomName: row.room_name,
-    provider: "livekit", providerRoomId: row.provider_room_id,
-    status: row.status as SessionRecord["status"], createdAt: row.created_at,
-  };
+  return res.rows[0] ? mapSessionRow(res.rows[0]) : null;
 }
 
-export async function endSession(sessionId: string): Promise<SessionRecord | null> {
-  await query("UPDATE sessions SET status = 'ended' WHERE id = $1", [sessionId]);
+export async function endSession(sessionId: string, endReason?: string, endedBy?: string): Promise<SessionRecord | null> {
+  await query(
+    "UPDATE sessions SET status = 'ended', end_reason = COALESCE($2, end_reason), ended_by = COALESCE($3, ended_by) WHERE id = $1",
+    [sessionId, endReason ?? null, endedBy ?? null],
+  );
   return getSession(sessionId);
 }
 

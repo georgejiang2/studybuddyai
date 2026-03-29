@@ -52,10 +52,11 @@ interface Props {
   partnerProfile: PartnerProfile | null;
   onEnd: () => void;
   onSkip: () => void;
+  onSkippedByPartner: () => void;
   onAddFriend: (partnerId: string) => void;
 }
 
-export default function StudySession({ sessionPayload, partnerProfile, onEnd, onSkip, onAddFriend }: Props) {
+export default function StudySession({ sessionPayload, partnerProfile, onEnd, onSkip, onSkippedByPartner, onAddFriend }: Props) {
   const [chatOpen, setChatOpen] = useState(false);
   const [friendAdded, setFriendAdded] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -64,6 +65,8 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
   const lastSeenMessageAtRef = useRef<string | null>(null);
   const chatOpenRef = useRef(chatOpen);
   const bgPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionStatusPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionEndedRef = useRef(false);
 
   // Keep ref in sync
   useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
@@ -97,6 +100,26 @@ export default function StudySession({ sessionPayload, partnerProfile, onEnd, on
     bgPollRef.current = setInterval(poll, 3000);
     return () => { if (bgPollRef.current) clearInterval(bgPollRef.current); };
   }, [sessionPayload.sessionId, sessionPayload.partnerId]);
+
+  // Poll session status to detect if partner skipped us
+  useEffect(() => {
+    const poll = async () => {
+      if (sessionEndedRef.current) return;
+      try {
+        const res = await api.getSessionStatus(sessionPayload.sessionId);
+        if (res.skippedByPartner) {
+          sessionEndedRef.current = true;
+          if (sessionStatusPollRef.current) clearInterval(sessionStatusPollRef.current);
+          if (bgPollRef.current) clearInterval(bgPollRef.current);
+          onSkippedByPartner();
+        }
+      } catch {
+        // ignore
+      }
+    };
+    sessionStatusPollRef.current = setInterval(poll, 3000);
+    return () => { if (sessionStatusPollRef.current) clearInterval(sessionStatusPollRef.current); };
+  }, [sessionPayload.sessionId, onSkippedByPartner]);
 
   const handleAddFriend = async () => {
     if (friendAdded) return;

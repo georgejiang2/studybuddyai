@@ -79,6 +79,8 @@ export async function initDatabase() {
       provider TEXT NOT NULL DEFAULT 'livekit',
       provider_room_id TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'active',
+      end_reason TEXT,
+      ended_by TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -126,6 +128,12 @@ export async function initDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  // Migrations for existing databases
+  await query(`
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS end_reason TEXT;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended_by TEXT;
+  `).catch(() => { /* columns may already exist */ });
 }
 
 const g = globalThis as typeof globalThis & { __db_initialized__?: boolean };

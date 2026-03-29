@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [pendingFriendCount, setPendingFriendCount] = useState(0);
   const [incomingCall, setIncomingCall] = useState<{ call: CallRecord; callerProfile: CallerProfile } | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [skippedByPartner, setSkippedByPartner] = useState(false);
   const friendPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const callPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -122,6 +123,19 @@ export default function DashboardPage() {
     refresh();
   };
 
+  const handleSkippedByPartner = useCallback(() => {
+    setSessionPayload(null);
+    setPartnerProfile(null);
+    setSkippedByPartner(true);
+    setView('home');
+    refresh();
+    // Auto-requeue after showing the message briefly
+    setTimeout(() => {
+      setSkippedByPartner(false);
+      setView('searching');
+    }, 2000);
+  }, [refresh]);
+
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
     try {
@@ -152,6 +166,18 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await logout();
   };
+
+  // Skipped by partner screen
+  if (skippedByPartner) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.sessionEndedOverlay}>
+          <h2>You were skipped</h2>
+          <p>Finding you a new study partner...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Session ended screen
   if (sessionEnded) {
@@ -187,6 +213,7 @@ export default function DashboardPage() {
         partnerProfile={partnerProfile}
         onEnd={handleSessionEnd}
         onSkip={handleSkip}
+        onSkippedByPartner={handleSkippedByPartner}
         onAddFriend={() => {}}
       />
     );

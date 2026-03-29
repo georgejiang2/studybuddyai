@@ -59,6 +59,8 @@ export interface SessionRecord {
   provider: "livekit";
   providerRoomId: string;
   status: SessionStatus;
+  endReason: string | null;
+  endedBy: string | null;
   createdAt: string;
 }
 
