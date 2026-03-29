@@ -15,12 +15,12 @@ type RouteContext = {
 };
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
   const { friendId } = await context.params;
-  const friendship = getFriendshipBetween(user.id, friendId);
+  const friendship = await getFriendshipBetween(user.id, friendId);
 
   if (!friendship || friendship.status !== "accepted") {
     return notFound("Accepted friendship required to access chat.");
@@ -28,17 +28,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   return ok({
     friendship,
-    messages: listMessagesForFriendship(friendship.id),
+    messages: await listMessagesForFriendship(friendship.id),
   });
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
   const { friendId } = await context.params;
-  const friendship = getFriendshipBetween(user.id, friendId);
+  const friendship = await getFriendshipBetween(user.id, friendId);
 
   if (!friendship || friendship.status !== "accepted") {
     return notFound("Accepted friendship required to send messages.");
@@ -51,6 +51,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   return ok({
-    message: createMessage(friendship.id, user.id, friendId, text),
+    message: await createMessage(friendship.id, user.id, friendId, text),
   });
 }

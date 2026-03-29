@@ -127,8 +127,8 @@ function editDistance(a: string, b: string): number {
   return dp[m][n];
 }
 
-function subjectTokens(userId: string): Set<string> {
-  const subjects = getProfileSubjects(userId);
+async function subjectTokens(userId: string): Promise<Set<string>> {
+  const subjects = await getProfileSubjects(userId);
   const tokens = new Set<string>();
   for (const subject of subjects) {
     for (const word of normalizeString(subject).split(/\s+/)) {
@@ -166,16 +166,16 @@ interface MatchScore {
   };
 }
 
-function computeMatchScore(
+async function computeMatchScore(
   userId: string,
   candidateId: string,
   userQueueSubject: string,
   candidateQueueSubject: string,
   userQueuedAt: string,
   candidateQueuedAt: string,
-): MatchScore | null {
-  const profileA = getProfile(userId);
-  const profileB = getProfile(candidateId);
+): Promise<MatchScore | null> {
+  const profileA = await getProfile(userId);
+  const profileB = await getProfile(candidateId);
   if (!profileA || !profileB) return null;
 
   const sameCurrentSubject =
@@ -184,7 +184,7 @@ function computeMatchScore(
   const currentSubjectScore = sameCurrentSubject ? 1.0 : 0.0;
 
   // Jaccard on all subject word tokens
-  const subjectsScore = jaccard(subjectTokens(userId), subjectTokens(candidateId));
+  const subjectsScore = jaccard(await subjectTokens(userId), await subjectTokens(candidateId));
 
   // Exact match on standardized school (from dropdown)
   const schoolScore =
@@ -224,13 +224,13 @@ function computeMatchScore(
 
 // ── Match reason builder ────────────────────────────────
 
-function buildMatchReason(
+async function buildMatchReason(
   userId: string,
   partnerId: string,
   currentSubject: string,
   score: MatchScore,
-): string {
-  const partner = getProfile(partnerId);
+): Promise<string> {
+  const partner = await getProfile(partnerId);
   if (!partner) return "You were matched based on your profiles.";
 
   const parts: string[] = [];
@@ -250,7 +250,7 @@ function buildMatchReason(
   }
 
   if (score.breakdown.subjects > 0.1 && score.breakdown.currentSubject < 1) {
-    const overlap = getOverlappingSubjectNames(userId, partnerId);
+    const overlap = await getOverlappingSubjectNames(userId, partnerId);
     if (overlap.length > 0) {
       parts.push(`you both study ${overlap.slice(0, 2).join(" and ")}`);
     }
@@ -269,10 +269,10 @@ function buildMatchReason(
   return parts.join(", ") + `.`;
 }
 
-function getOverlappingSubjectNames(userA: string, userB: string): string[] {
-  const subjectsA = getProfileSubjects(userA).map((s) => normalizeString(s));
-  const subjectsB = new Set(getProfileSubjects(userB).map((s) => normalizeString(s)));
-  const originalA = getProfileSubjects(userA);
+async function getOverlappingSubjectNames(userA: string, userB: string): Promise<string[]> {
+  const originalA = await getProfileSubjects(userA);
+  const subjectsA = originalA.map((s) => normalizeString(s));
+  const subjectsB = new Set((await getProfileSubjects(userB)).map((s) => normalizeString(s)));
   const result: string[] = [];
   for (let i = 0; i < subjectsA.length; i++) {
     if (subjectsB.has(subjectsA[i])) {
@@ -284,8 +284,8 @@ function getOverlappingSubjectNames(userA: string, userB: string): string[] {
 
 // ── Partner profile builder ─────────────────────────────
 
-function buildPartnerProfile(userId: string): PartnerProfileSummary | null {
-  const profile = getProfile(userId);
+async function buildPartnerProfile(userId: string): Promise<PartnerProfileSummary | null> {
+  const profile = await getProfile(userId);
   if (!profile) return null;
 
   return {
@@ -295,87 +295,94 @@ function buildPartnerProfile(userId: string): PartnerProfileSummary | null {
     major: profile.major,
     year: profile.year,
     bio: profile.bio,
-    subjects: getProfileSubjects(userId),
+    subjects: await getProfileSubjects(userId),
   };
 }
 
 // ── Core matching logic ─────────────────────────────────
 
-export function findOrCreateMatch(userId: string): MatchStatusResponse {
-  const queueEntry = getQueueEntry(userId);
+export async function findOrCreateMatch(userId: string): Promise<MatchStatusResponse> {
+  const queueEntry = await getQueueEntry(userId);
   if (!queueEntry) {
     return idle();
   }
 
-  const profile = getProfile(userId);
-  if (!profile || !isProfileComplete(userId) || getActiveSessionForUser(userId)) {
+  const profile = await getProfile(userId);
+  if (!profile || !(await isProfileComplete(userId)) || await getActiveSessionForUser(userId)) {
     return waiting(queueEntry.queuedAt, queueEntry.currentSubject);
   }
 
   const waitedMs = Date.now() - new Date(queueEntry.queuedAt).getTime();
   const strictSubjectWindow = waitedMs < SUBJECT_STRICT_WINDOW_MS;
 
-  const candidates = listQueueEntries().filter((c) => {
-    if (c.userId === userId) return false;
-    if (!isProfileComplete(c.userId) || getActiveSessionForUser(c.userId)) return false;
+  const allEntries = await listQueueEntries();
+  const candidates: typeof allEntries = [];
+  for (const c of allEntries) {
+    if (c.userId === userId) continue;
+    if (!(await isProfileComplete(c.userId)) || await getActiveSessionForUser(c.userId)) continue;
     if (strictSubjectWindow) {
-      return c.normalizedCurrentSubject === queueEntry.normalizedCurrentSubject;
+      if (c.normalizedCurrentSubject === queueEntry.normalizedCurrentSubject) {
+        candidates.push(c);
+      }
+    } else {
+      candidates.push(c);
     }
-    return true;
-  });
+  }
 
-  const scored = candidates
-    .map((c) => {
-      const score = computeMatchScore(
-        userId,
-        c.userId,
-        queueEntry.currentSubject,
-        c.currentSubject,
-        queueEntry.queuedAt,
-        c.queuedAt,
-      );
-      return score ? { candidate: c, score } : null;
-    })
-    .filter((v): v is NonNullable<typeof v> => v !== null)
-    .sort((a, b) => b.score.total - a.score.total);
+  const scoredResults: { candidate: typeof allEntries[number]; score: MatchScore }[] = [];
+  for (const c of candidates) {
+    const score = await computeMatchScore(
+      userId,
+      c.userId,
+      queueEntry.currentSubject,
+      c.currentSubject,
+      queueEntry.queuedAt,
+      c.queuedAt,
+    );
+    if (score) {
+      scoredResults.push({ candidate: c, score });
+    }
+  }
+  scoredResults.sort((a, b) => b.score.total - a.score.total);
 
-  const best = scored[0];
+  const best = scoredResults[0];
   if (!best || best.score.total < MINIMUM_MATCH_SCORE) {
     return waiting(queueEntry.queuedAt, queueEntry.currentSubject);
   }
 
   const matchType = best.score.sameCurrentSubject ? "same_subject" : "expanded";
-  const reason = buildMatchReason(
+  const reason = await buildMatchReason(
     userId,
     best.candidate.userId,
     queueEntry.currentSubject,
     best.score,
   );
 
-  const match = createMatch(userId, best.candidate.userId, matchType, reason);
-  const session = createSession(match.id);
+  const match = await createMatch(userId, best.candidate.userId, matchType, reason);
+  const session = await createSession(match.id);
 
-  removeQueueEntry(userId);
-  removeQueueEntry(best.candidate.userId);
+  await removeQueueEntry(userId);
+  await removeQueueEntry(best.candidate.userId);
 
   return {
     status: "matched",
     matchId: match.id,
     matchType: match.matchType,
     reason: match.reason,
-    partnerProfile: buildPartnerProfile(getPartnerUserId(match, userId)),
+    partnerProfile: await buildPartnerProfile(getPartnerUserId(match, userId)),
     queuedAt: null,
     currentSubject: queueEntry.currentSubject,
     sessionId: session.id,
   };
 }
 
-export function getUserMatchStatus(userId: string): MatchStatusResponse {
-  const activeSession = getActiveSessionForUser(userId);
-  const queueEntry = getQueueEntry(userId);
+export async function getUserMatchStatus(userId: string): Promise<MatchStatusResponse> {
+  const activeSession = await getActiveSessionForUser(userId);
+  const queueEntry = await getQueueEntry(userId);
 
   if (activeSession) {
-    const match = listMatchesForUser(userId).find(
+    const matches = await listMatchesForUser(userId);
+    const match = matches.find(
       (m) => m.id === activeSession.matchId,
     );
     if (match) {
@@ -384,7 +391,7 @@ export function getUserMatchStatus(userId: string): MatchStatusResponse {
         matchId: match.id,
         matchType: match.matchType,
         reason: match.reason,
-        partnerProfile: buildPartnerProfile(getPartnerUserId(match, userId)),
+        partnerProfile: await buildPartnerProfile(getPartnerUserId(match, userId)),
         queuedAt: null,
         currentSubject: null,
         sessionId: activeSession.id,

@@ -5,21 +5,24 @@ import { ok, unauthorized } from "@/lib/studybuddy/http";
 import { getProfile, listFriendshipsForUser } from "@/lib/studybuddy/store";
 
 export async function GET(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
-  const friendships = listFriendshipsForUser(user.id).map((friendship) => {
-    const partnerId =
-      friendship.requesterId === user.id
-        ? friendship.recipientId
-        : friendship.requesterId;
+  const friendshipList = await listFriendshipsForUser(user.id);
+  const friendships = await Promise.all(
+    friendshipList.map(async (friendship) => {
+      const partnerId =
+        friendship.requesterId === user.id
+          ? friendship.recipientId
+          : friendship.requesterId;
 
-    return {
-      ...friendship,
-      partnerProfile: getProfile(partnerId),
-    };
-  });
+      return {
+        ...friendship,
+        partnerProfile: await getProfile(partnerId),
+      };
+    }),
+  );
 
   return ok({ friendships });
 }

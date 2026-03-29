@@ -45,13 +45,13 @@ function createSignedLiveKitToken(identity: string, roomName: string, name: stri
   return `${header}.${payload}.${signature}`;
 }
 
-export function getSessionJoinPayload(sessionId: string, userId: string) {
-  const session = getSession(sessionId);
+export async function getSessionJoinPayload(sessionId: string, userId: string) {
+  const session = await getSession(sessionId);
   if (!session) {
     return null;
   }
 
-  const match = getMatch(session.matchId);
+  const match = await getMatch(session.matchId);
   if (!match) {
     return null;
   }
@@ -60,7 +60,7 @@ export function getSessionJoinPayload(sessionId: string, userId: string) {
     return null;
   }
 
-  const profile = getProfile(userId);
+  const profile = await getProfile(userId);
   const displayName = profile?.name ?? userId;
   const partnerId = match.userA === userId ? match.userB : match.userA;
 
@@ -74,8 +74,8 @@ export function getSessionJoinPayload(sessionId: string, userId: string) {
   };
 }
 
-export function getSessionJoinPayloadForMatch(matchId: string, userId: string) {
-  const session = getSessionByMatchId(matchId);
+export async function getSessionJoinPayloadForMatch(matchId: string, userId: string) {
+  const session = await getSessionByMatchId(matchId);
   if (!session) {
     return null;
   }

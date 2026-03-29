@@ -8,7 +8,7 @@ import {
 } from "@/lib/studybuddy/session";
 
 export async function POST(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = sessionId
-    ? getSessionJoinPayload(sessionId, user.id)
-    : getSessionJoinPayloadForMatch(matchId, user.id);
+    ? await getSessionJoinPayload(sessionId, user.id)
+    : await getSessionJoinPayloadForMatch(matchId, user.id);
 
   if (!payload) {
     return notFound("No joinable session was found for this user.");

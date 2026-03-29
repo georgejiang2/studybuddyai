@@ -8,7 +8,7 @@ import {
 } from "@/lib/studybuddy/store";
 
 export async function POST(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
     return badRequest("Provide friendshipId and an action of accept or reject.");
   }
 
-  const friendship = listFriendshipsForUser(user.id).find(
+  const friendships = await listFriendshipsForUser(user.id);
+  const friendship = friendships.find(
     (candidate) => candidate.id === friendshipId,
   );
   if (!friendship) {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   return ok({
-    friendship: updateFriendshipStatus(
+    friendship: await updateFriendshipStatus(
       friendship.id,
       action === "accept" ? "accepted" : "rejected",
     ),

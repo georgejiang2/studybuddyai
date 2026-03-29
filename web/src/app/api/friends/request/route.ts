@@ -10,7 +10,7 @@ import {
 } from "@/lib/studybuddy/store";
 
 export async function POST(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
@@ -26,20 +26,20 @@ export async function POST(request: NextRequest) {
     return badRequest("You cannot friend yourself.");
   }
 
-  if (!getUser(recipientId)) {
+  if (!(await getUser(recipientId))) {
     return badRequest("Recipient does not exist.");
   }
 
-  const existing = getFriendshipBetween(user.id, recipientId);
+  const existing = await getFriendshipBetween(user.id, recipientId);
   if (existing) {
     if (existing.status === "pending" && existing.recipientId === user.id) {
-      const accepted = updateFriendshipStatus(existing.id, "accepted");
+      const accepted = await updateFriendshipStatus(existing.id, "accepted");
       return ok({ friendship: accepted, autoAccepted: true });
     }
     return ok({ friendship: existing, reused: true });
   }
 
   return ok({
-    friendship: createFriendRequest(user.id, recipientId),
+    friendship: await createFriendRequest(user.id, recipientId),
   });
 }

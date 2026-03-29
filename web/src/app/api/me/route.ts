@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { getRequestUser } from "@/lib/studybuddy/auth";
+import { ensureInitialized } from "@/lib/studybuddy/db";
 import { ok, unauthorized } from "@/lib/studybuddy/http";
 import { getUserMatchStatus } from "@/lib/studybuddy/matching";
 import {
@@ -11,26 +12,31 @@ import {
 } from "@/lib/studybuddy/store";
 
 export async function GET(request: NextRequest) {
-  const user = getRequestUser(request);
+  await ensureInitialized();
+
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
 
-  const friendships = listFriendshipsForUser(user.id).map((f) => {
-    const partnerId =
-      f.requesterId === user.id ? f.recipientId : f.requesterId;
-    return {
-      ...f,
-      partnerProfile: getProfile(partnerId),
-    };
-  });
+  const friendshipList = await listFriendshipsForUser(user.id);
+  const friendships = await Promise.all(
+    friendshipList.map(async (f) => {
+      const partnerId =
+        f.requesterId === user.id ? f.recipientId : f.requesterId;
+      return {
+        ...f,
+        partnerProfile: await getProfile(partnerId),
+      };
+    }),
+  );
 
   return ok({
     user,
-    profile: getProfile(user.id),
-    subjects: getProfileSubjects(user.id),
-    profileCompleted: isProfileComplete(user.id),
-    matchStatus: getUserMatchStatus(user.id),
+    profile: await getProfile(user.id),
+    subjects: await getProfileSubjects(user.id),
+    profileCompleted: await isProfileComplete(user.id),
+    matchStatus: await getUserMatchStatus(user.id),
     friendships,
   });
 }

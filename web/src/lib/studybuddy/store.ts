@@ -1,3 +1,4 @@
+import { query } from "@/lib/studybuddy/db";
 import {
   type AcademicYear,
   type AuthUser,
@@ -10,22 +11,6 @@ import {
   type SessionRecord,
   type SessionMessageRecord,
 } from "@/lib/studybuddy/types";
-
-interface StoreState {
-  users: Map<string, AuthUser>;
-  userPasswords: Map<string, string>;
-  userIdsByEmail: Map<string, string>;
-  profiles: Map<string, Profile>;
-  profileSubjects: Map<string, string[]>;
-  queue: Map<string, QueueEntry>;
-  matches: Map<string, MatchRecord>;
-  sessions: Map<string, SessionRecord>;
-  friends: Map<string, FriendRecord>;
-  messages: Map<string, MessageRecord>;
-  sessionMessages: Map<string, SessionMessageRecord>;
-}
-
-const STORE_KEY = "__studybuddy_store__";
 
 function nowIso() {
   return new Date().toISOString();
@@ -41,385 +26,389 @@ function normalizeSubject(subject: string) {
 
 function normalizeYear(year: string): AcademicYear {
   const normalized = year.trim().toLowerCase();
-  if (
-    normalized === "freshman" ||
-    normalized === "sophomore" ||
-    normalized === "junior" ||
-    normalized === "senior" ||
-    normalized === "grad"
-  ) {
-    return normalized;
+  if (["freshman", "sophomore", "junior", "senior", "grad"].includes(normalized)) {
+    return normalized as AcademicYear;
   }
   return "junior";
 }
 
-function createSeedState(): StoreState {
-  const users = new Map<string, AuthUser>([
-    ["demo-user-1", { id: "demo-user-1", email: "ava@studybuddy.dev" }],
-    ["demo-user-2", { id: "demo-user-2", email: "miles@studybuddy.dev" }],
-    ["demo-user-3", { id: "demo-user-3", email: "sofia@studybuddy.dev" }],
-  ]);
+// ── Users ──────────────────────────────────────────────
 
-  const profiles = new Map<string, Profile>([
-    [
-      "demo-user-1",
-      {
-        userId: "demo-user-1",
-        name: "Ava Chen",
-        school: "Georgia Tech",
-        normalizedSchool: "Georgia Institute of Technology",
-        major: "Computer Science",
-        normalizedMajor: "Computer Science",
-        year: "junior",
-        bio: "Studying for systems and interview-heavy classes.",
-        updatedAt: nowIso(),
-      },
-    ],
-    [
-      "demo-user-2",
-      {
-        userId: "demo-user-2",
-        name: "Miles Carter",
-        school: "Georgia Tech",
-        normalizedSchool: "Georgia Institute of Technology",
-        major: "Computer Science",
-        normalizedMajor: "Computer Science",
-        year: "junior",
-        bio: "Best in focused sprint sessions with shared notes.",
-        updatedAt: nowIso(),
-      },
-    ],
-    [
-      "demo-user-3",
-      {
-        userId: "demo-user-3",
-        name: "Sofia Patel",
-        school: "Emory University",
-        normalizedSchool: "Emory University",
-        major: "Mathematics",
-        normalizedMajor: "Mathematics",
-        year: "senior",
-        bio: "Looking for accountability and exam-prep sessions.",
-        updatedAt: nowIso(),
-      },
-    ],
-  ]);
-
-  const profileSubjects = new Map<string, string[]>([
-    ["demo-user-1", ["Data Structures", "Algorithms", "Operating Systems"]],
-    ["demo-user-2", ["Data Structures", "Databases", "Computer Networks"]],
-    ["demo-user-3", ["Calculus", "Linear Algebra", "Probability"]],
-  ]);
-
-  return {
-    users,
-    userPasswords: new Map<string, string>([
-      ["demo-user-1", "demo12345"],
-      ["demo-user-2", "demo12345"],
-      ["demo-user-3", "demo12345"],
-    ]),
-    userIdsByEmail: new Map<string, string>([
-      ["ava@studybuddy.dev", "demo-user-1"],
-      ["miles@studybuddy.dev", "demo-user-2"],
-      ["sofia@studybuddy.dev", "demo-user-3"],
-    ]),
-    profiles,
-    profileSubjects,
-    queue: new Map(),
-    matches: new Map(),
-    sessions: new Map(),
-    friends: new Map(),
-    messages: new Map(),
-    sessionMessages: new Map(),
-  };
+export async function ensureUser(id: string, email: string): Promise<AuthUser> {
+  await query(
+    "INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+    [id, email.toLowerCase()],
+  );
+  return { id, email };
 }
 
-function getState(): StoreState {
-  const globalStore = globalThis as typeof globalThis & {
-    [STORE_KEY]?: StoreState;
-  };
-
-  if (!globalStore[STORE_KEY]) {
-    globalStore[STORE_KEY] = createSeedState();
-  }
-
-  return globalStore[STORE_KEY];
+export async function getUser(id: string): Promise<AuthUser | null> {
+  const res = await query<{ id: string; email: string }>(
+    "SELECT id, email FROM users WHERE id = $1",
+    [id],
+  );
+  return res.rows[0] ?? null;
 }
 
-export function ensureUser(id: string, email: string) {
-  const state = getState();
-  const existing = state.users.get(id);
-  if (existing) {
-    return existing;
-  }
-  const user = { id, email };
-  state.users.set(id, user);
-  state.userIdsByEmail.set(email.toLowerCase(), id);
-  return user;
+export async function getUserByEmail(email: string): Promise<AuthUser | null> {
+  const res = await query<{ id: string; email: string }>(
+    "SELECT id, email FROM users WHERE LOWER(email) = $1",
+    [email.trim().toLowerCase()],
+  );
+  return res.rows[0] ?? null;
 }
 
-export function getUser(id: string) {
-  return getState().users.get(id) ?? null;
-}
-
-export function getUserByEmail(email: string) {
+export async function createUserAccount(email: string, password: string): Promise<AuthUser | null> {
   const normalized = email.trim().toLowerCase();
-  const userId = getState().userIdsByEmail.get(normalized);
-  return userId ? getUser(userId) : null;
+  const existing = await getUserByEmail(normalized);
+  if (existing) return null;
+
+  const id = `user_${crypto.randomUUID()}`;
+  await query("INSERT INTO users (id, email) VALUES ($1, $2)", [id, normalized]);
+  await query("INSERT INTO user_passwords (user_id, password) VALUES ($1, $2)", [id, password]);
+  return { id, email: normalized };
 }
 
-export function createUserAccount(email: string, password: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-  const existing = getUserByEmail(normalizedEmail);
-  if (existing) {
-    return null;
-  }
-
-  const state = getState();
-  const user: AuthUser = {
-    id: `user_${crypto.randomUUID()}`,
-    email: normalizedEmail,
-  };
-  state.users.set(user.id, user);
-  state.userIdsByEmail.set(normalizedEmail, user.id);
-  state.userPasswords.set(user.id, password);
+export async function validateUserCredentials(email: string, password: string): Promise<AuthUser | null> {
+  const user = await getUserByEmail(email);
+  if (!user) return null;
+  const res = await query<{ password: string }>(
+    "SELECT password FROM user_passwords WHERE user_id = $1",
+    [user.id],
+  );
+  if (!res.rows[0] || res.rows[0].password !== password) return null;
   return user;
 }
 
-export function validateUserCredentials(email: string, password: string) {
-  const user = getUserByEmail(email);
-  if (!user) {
-    return null;
-  }
+// ── Profiles ───────────────────────────────────────────
 
-  const savedPassword = getState().userPasswords.get(user.id);
-  if (!savedPassword || savedPassword !== password) {
-    return null;
-  }
-
-  return user;
-}
-
-export function getProfile(userId: string) {
-  return getState().profiles.get(userId) ?? null;
-}
-
-export function getProfileSubjects(userId: string) {
-  return [...(getState().profileSubjects.get(userId) ?? [])];
-}
-
-export function isProfileComplete(userId: string) {
-  const profile = getProfile(userId);
-  const subjects = getProfileSubjects(userId);
-  return Boolean(
-    profile &&
-      profile.name &&
-      profile.school &&
-      profile.major &&
-      profile.bio &&
-      subjects.length > 0,
-  );
-}
-
-export function upsertProfile(userId: string, input: ProfileSetupInput) {
-  const state = getState();
-  const profile: Profile = {
-    userId,
-    name: input.name.trim(),
-    school: input.school.trim(),
-    normalizedSchool: (input.normalizedSchool ?? input.school).trim(),
-    major: input.major.trim(),
-    normalizedMajor: (input.normalizedMajor ?? input.major).trim(),
-    year: normalizeYear(input.year),
-    bio: input.bio.trim(),
-    updatedAt: nowIso(),
-  };
-
-  const uniqueSubjects = Array.from(
-    new Set(
-      input.subjects
-        .map((subject) => subject.trim())
-        .filter(Boolean),
-    ),
-  );
-
-  state.profiles.set(userId, profile);
-  state.profileSubjects.set(userId, uniqueSubjects);
+export async function getProfile(userId: string): Promise<Profile | null> {
+  const res = await query<{
+    user_id: string; name: string; school: string; normalized_school: string;
+    major: string; normalized_major: string; year: AcademicYear; bio: string; updated_at: string;
+  }>("SELECT * FROM profiles WHERE user_id = $1", [userId]);
+  const row = res.rows[0];
+  if (!row) return null;
   return {
-    profile,
-    subjects: uniqueSubjects,
+    userId: row.user_id,
+    name: row.name,
+    school: row.school,
+    normalizedSchool: row.normalized_school,
+    major: row.major,
+    normalizedMajor: row.normalized_major,
+    year: row.year,
+    bio: row.bio,
+    updatedAt: row.updated_at,
   };
 }
 
-export function getQueueEntry(userId: string) {
-  return getState().queue.get(userId) ?? null;
+export async function getProfileSubjects(userId: string): Promise<string[]> {
+  const res = await query<{ subject: string }>(
+    "SELECT subject FROM profile_subjects WHERE user_id = $1 ORDER BY id",
+    [userId],
+  );
+  return res.rows.map((r) => r.subject);
 }
 
-export function upsertQueueEntry(userId: string, currentSubject: string) {
-  const state = getState();
-  const existing = state.queue.get(userId);
-  const timestamp = nowIso();
-  const queueEntry: QueueEntry = {
-    userId,
-    currentSubject: currentSubject.trim(),
-    normalizedCurrentSubject: normalizeSubject(currentSubject),
-    status: "waiting",
-    queuedAt: existing?.queuedAt ?? timestamp,
-    lastSeenAt: timestamp,
-  };
-  state.queue.set(userId, queueEntry);
-  return queueEntry;
-}
-
-export function removeQueueEntry(userId: string) {
-  getState().queue.delete(userId);
-}
-
-export function listQueueEntries() {
-  return Array.from(getState().queue.values());
-}
-
-export function createMatch(
-  userA: string,
-  userB: string,
-  matchType: MatchRecord["matchType"],
-  reason: string,
-) {
-  const state = getState();
-  const match: MatchRecord = {
-    id: makeId("match"),
-    userA,
-    userB,
-    matchType,
-    reason,
-    createdAt: nowIso(),
-  };
-  state.matches.set(match.id, match);
-  return match;
-}
-
-export function getMatch(matchId: string) {
-  return getState().matches.get(matchId) ?? null;
-}
-
-export function listMatchesForUser(userId: string) {
-  return Array.from(getState().matches.values())
-    .filter((match) => match.userA === userId || match.userB === userId)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-}
-
-export function createSession(matchId: string) {
-  const state = getState();
-  const session: SessionRecord = {
-    id: makeId("session"),
-    matchId,
-    roomName: `studybuddy-${matchId.slice(-8)}`,
-    provider: "livekit",
-    providerRoomId: matchId,
-    status: "active",
-    createdAt: nowIso(),
-  };
-  state.sessions.set(session.id, session);
-  return session;
-}
-
-export function getSession(sessionId: string) {
-  return getState().sessions.get(sessionId) ?? null;
-}
-
-export function getSessionByMatchId(matchId: string) {
-  return (
-    Array.from(getState().sessions.values()).find(
-      (session) => session.matchId === matchId && session.status === "active",
-    ) ?? null
+export async function isProfileComplete(userId: string): Promise<boolean> {
+  const profile = await getProfile(userId);
+  const subjects = await getProfileSubjects(userId);
+  return Boolean(
+    profile && profile.name && profile.school && profile.major && profile.bio && subjects.length > 0,
   );
 }
 
-export function getActiveSessionForUser(userId: string) {
-  const matches = listMatchesForUser(userId).map((match) => match.id);
-  return (
-    Array.from(getState().sessions.values()).find(
-      (session) =>
-        session.status === "active" && matches.includes(session.matchId),
-    ) ?? null
+export async function upsertProfile(userId: string, input: ProfileSetupInput) {
+  const year = normalizeYear(input.year);
+  await query(
+    `INSERT INTO profiles (user_id, name, school, normalized_school, major, normalized_major, year, bio, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+     ON CONFLICT (user_id) DO UPDATE SET
+       name = $2, school = $3, normalized_school = $4, major = $5,
+       normalized_major = $6, year = $7, bio = $8, updated_at = NOW()`,
+    [userId, input.name.trim(), input.school.trim(), (input.normalizedSchool ?? input.school).trim(),
+     input.major.trim(), (input.normalizedMajor ?? input.major).trim(), year, input.bio.trim()],
   );
-}
 
-export function getFriendshipBetween(userA: string, userB: string) {
-  return (
-    Array.from(getState().friends.values()).find(
-      (friend) =>
-        (friend.requesterId === userA && friend.recipientId === userB) ||
-        (friend.requesterId === userB && friend.recipientId === userA),
-    ) ?? null
-  );
-}
-
-export function createFriendRequest(requesterId: string, recipientId: string) {
-  const state = getState();
-  const timestamp = nowIso();
-  const friend: FriendRecord = {
-    id: makeId("friend"),
-    requesterId,
-    recipientId,
-    status: "pending",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-  state.friends.set(friend.id, friend);
-  return friend;
-}
-
-export function updateFriendshipStatus(
-  friendId: string,
-  status: FriendRecord["status"],
-) {
-  const state = getState();
-  const friend = state.friends.get(friendId);
-  if (!friend) {
-    return null;
+  // Replace subjects
+  await query("DELETE FROM profile_subjects WHERE user_id = $1", [userId]);
+  const uniqueSubjects = [...new Set(input.subjects.map((s) => s.trim()).filter(Boolean))];
+  for (const subject of uniqueSubjects) {
+    await query(
+      "INSERT INTO profile_subjects (user_id, subject) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      [userId, subject],
+    );
   }
-  const updated: FriendRecord = {
-    ...friend,
-    status,
-    updatedAt: nowIso(),
+
+  return { profile: await getProfile(userId), subjects: uniqueSubjects };
+}
+
+// ── Queue ──────────────────────────────────────────────
+
+export async function getQueueEntry(userId: string): Promise<QueueEntry | null> {
+  const res = await query<{
+    user_id: string; current_subject: string; normalized_current_subject: string;
+    status: string; queued_at: string; last_seen_at: string;
+  }>("SELECT * FROM queue WHERE user_id = $1", [userId]);
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    userId: row.user_id,
+    currentSubject: row.current_subject,
+    normalizedCurrentSubject: row.normalized_current_subject,
+    status: "waiting",
+    queuedAt: row.queued_at,
+    lastSeenAt: row.last_seen_at,
   };
-  state.friends.set(friendId, updated);
-  return updated;
 }
 
-export function listFriendshipsForUser(userId: string) {
-  return Array.from(getState().friends.values())
-    .filter(
-      (friend) => friend.requesterId === userId || friend.recipientId === userId,
-    )
-    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+export async function upsertQueueEntry(userId: string, currentSubject: string): Promise<QueueEntry> {
+  const normalized = normalizeSubject(currentSubject);
+  await query(
+    `INSERT INTO queue (user_id, current_subject, normalized_current_subject, status, queued_at, last_seen_at)
+     VALUES ($1, $2, $3, 'waiting', NOW(), NOW())
+     ON CONFLICT (user_id) DO UPDATE SET
+       current_subject = $2, normalized_current_subject = $3, last_seen_at = NOW()`,
+    [userId, currentSubject.trim(), normalized],
+  );
+  return (await getQueueEntry(userId))!;
 }
 
-export function createMessage(
-  friendshipId: string,
-  senderId: string,
-  recipientId: string,
-  text: string,
-) {
-  const state = getState();
-  const message: MessageRecord = {
-    id: makeId("msg"),
-    friendshipId,
-    senderId,
-    recipientId,
-    text: text.trim(),
-    createdAt: nowIso(),
+export async function removeQueueEntry(userId: string) {
+  await query("DELETE FROM queue WHERE user_id = $1", [userId]);
+}
+
+export async function listQueueEntries(): Promise<QueueEntry[]> {
+  const res = await query<{
+    user_id: string; current_subject: string; normalized_current_subject: string;
+    status: string; queued_at: string; last_seen_at: string;
+  }>("SELECT * FROM queue");
+  return res.rows.map((row) => ({
+    userId: row.user_id,
+    currentSubject: row.current_subject,
+    normalizedCurrentSubject: row.normalized_current_subject,
+    status: "waiting" as const,
+    queuedAt: row.queued_at,
+    lastSeenAt: row.last_seen_at,
+  }));
+}
+
+// ── Matches ────────────────────────────────────────────
+
+export async function createMatch(
+  userA: string, userB: string, matchType: MatchRecord["matchType"], reason: string,
+): Promise<MatchRecord> {
+  const id = makeId("match");
+  const now = nowIso();
+  await query(
+    "INSERT INTO matches (id, user_a, user_b, match_type, reason, created_at) VALUES ($1,$2,$3,$4,$5,$6)",
+    [id, userA, userB, matchType, reason, now],
+  );
+  return { id, userA, userB, matchType, reason, createdAt: now };
+}
+
+export async function getMatch(matchId: string): Promise<MatchRecord | null> {
+  const res = await query<{
+    id: string; user_a: string; user_b: string; match_type: string; reason: string; created_at: string;
+  }>("SELECT * FROM matches WHERE id = $1", [matchId]);
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id, userA: row.user_a, userB: row.user_b,
+    matchType: row.match_type as MatchRecord["matchType"],
+    reason: row.reason, createdAt: row.created_at,
   };
-  state.messages.set(message.id, message);
-  return message;
 }
 
-export function listMessagesForFriendship(friendshipId: string) {
-  return Array.from(getState().messages.values())
-    .filter((message) => message.friendshipId === friendshipId)
-    .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+export async function listMatchesForUser(userId: string): Promise<MatchRecord[]> {
+  const res = await query<{
+    id: string; user_a: string; user_b: string; match_type: string; reason: string; created_at: string;
+  }>("SELECT * FROM matches WHERE user_a = $1 OR user_b = $1 ORDER BY created_at DESC", [userId]);
+  return res.rows.map((row) => ({
+    id: row.id, userA: row.user_a, userB: row.user_b,
+    matchType: row.match_type as MatchRecord["matchType"],
+    reason: row.reason, createdAt: row.created_at,
+  }));
 }
+
+// ── Sessions ───────────────────────────────────────────
+
+export async function createSession(matchId: string): Promise<SessionRecord> {
+  const id = makeId("session");
+  const roomName = `studybuddy-${matchId.slice(-8)}`;
+  const now = nowIso();
+  await query(
+    "INSERT INTO sessions (id, match_id, room_name, provider, provider_room_id, status, created_at) VALUES ($1,$2,$3,'livekit',$2,'active',$4)",
+    [id, matchId, roomName, now],
+  );
+  return { id, matchId, roomName, provider: "livekit", providerRoomId: matchId, status: "active", createdAt: now };
+}
+
+export async function getSession(sessionId: string): Promise<SessionRecord | null> {
+  const res = await query<{
+    id: string; match_id: string; room_name: string; provider: string;
+    provider_room_id: string; status: string; created_at: string;
+  }>("SELECT * FROM sessions WHERE id = $1", [sessionId]);
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id, matchId: row.match_id, roomName: row.room_name,
+    provider: "livekit", providerRoomId: row.provider_room_id,
+    status: row.status as SessionRecord["status"], createdAt: row.created_at,
+  };
+}
+
+export async function getSessionByMatchId(matchId: string): Promise<SessionRecord | null> {
+  const res = await query<{
+    id: string; match_id: string; room_name: string; provider: string;
+    provider_room_id: string; status: string; created_at: string;
+  }>("SELECT * FROM sessions WHERE match_id = $1 AND status = 'active' LIMIT 1", [matchId]);
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id, matchId: row.match_id, roomName: row.room_name,
+    provider: "livekit", providerRoomId: row.provider_room_id,
+    status: row.status as SessionRecord["status"], createdAt: row.created_at,
+  };
+}
+
+export async function getActiveSessionForUser(userId: string): Promise<SessionRecord | null> {
+  const res = await query<{
+    id: string; match_id: string; room_name: string; provider: string;
+    provider_room_id: string; status: string; created_at: string;
+  }>(
+    `SELECT s.* FROM sessions s
+     JOIN matches m ON s.match_id = m.id
+     WHERE s.status = 'active' AND (m.user_a = $1 OR m.user_b = $1)
+     LIMIT 1`,
+    [userId],
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id, matchId: row.match_id, roomName: row.room_name,
+    provider: "livekit", providerRoomId: row.provider_room_id,
+    status: row.status as SessionRecord["status"], createdAt: row.created_at,
+  };
+}
+
+export async function endSession(sessionId: string): Promise<SessionRecord | null> {
+  await query("UPDATE sessions SET status = 'ended' WHERE id = $1", [sessionId]);
+  return getSession(sessionId);
+}
+
+// ── Friends ────────────────────────────────────────────
+
+export async function getFriendshipBetween(userA: string, userB: string): Promise<FriendRecord | null> {
+  const res = await query<{
+    id: string; requester_id: string; recipient_id: string; status: string;
+    created_at: string; updated_at: string;
+  }>(
+    `SELECT * FROM friends WHERE
+      (requester_id = $1 AND recipient_id = $2) OR (requester_id = $2 AND recipient_id = $1)
+     LIMIT 1`,
+    [userA, userB],
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id, requesterId: row.requester_id, recipientId: row.recipient_id,
+    status: row.status as FriendRecord["status"],
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+export async function createFriendRequest(requesterId: string, recipientId: string): Promise<FriendRecord> {
+  const id = makeId("friend");
+  const now = nowIso();
+  await query(
+    "INSERT INTO friends (id, requester_id, recipient_id, status, created_at, updated_at) VALUES ($1,$2,$3,'pending',$4,$4)",
+    [id, requesterId, recipientId, now],
+  );
+  return { id, requesterId, recipientId, status: "pending", createdAt: now, updatedAt: now };
+}
+
+export async function updateFriendshipStatus(friendId: string, status: FriendRecord["status"]): Promise<FriendRecord | null> {
+  await query("UPDATE friends SET status = $1, updated_at = NOW() WHERE id = $2", [status, friendId]);
+  const res = await query<{
+    id: string; requester_id: string; recipient_id: string; status: string;
+    created_at: string; updated_at: string;
+  }>("SELECT * FROM friends WHERE id = $1", [friendId]);
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id, requesterId: row.requester_id, recipientId: row.recipient_id,
+    status: row.status as FriendRecord["status"],
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+
+export async function listFriendshipsForUser(userId: string): Promise<FriendRecord[]> {
+  const res = await query<{
+    id: string; requester_id: string; recipient_id: string; status: string;
+    created_at: string; updated_at: string;
+  }>(
+    "SELECT * FROM friends WHERE requester_id = $1 OR recipient_id = $1 ORDER BY updated_at DESC",
+    [userId],
+  );
+  return res.rows.map((row) => ({
+    id: row.id, requesterId: row.requester_id, recipientId: row.recipient_id,
+    status: row.status as FriendRecord["status"],
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  }));
+}
+
+// ── Messages ───────────────────────────────────────────
+
+export async function createMessage(
+  friendshipId: string, senderId: string, recipientId: string, text: string,
+): Promise<MessageRecord> {
+  const id = makeId("msg");
+  const now = nowIso();
+  await query(
+    "INSERT INTO messages (id, friendship_id, sender_id, recipient_id, text, created_at) VALUES ($1,$2,$3,$4,$5,$6)",
+    [id, friendshipId, senderId, recipientId, text.trim(), now],
+  );
+  return { id, friendshipId, senderId, recipientId, text: text.trim(), createdAt: now };
+}
+
+export async function listMessagesForFriendship(friendshipId: string): Promise<MessageRecord[]> {
+  const res = await query<{
+    id: string; friendship_id: string; sender_id: string; recipient_id: string;
+    text: string; created_at: string;
+  }>("SELECT * FROM messages WHERE friendship_id = $1 ORDER BY created_at ASC", [friendshipId]);
+  return res.rows.map((row) => ({
+    id: row.id, friendshipId: row.friendship_id, senderId: row.sender_id,
+    recipientId: row.recipient_id, text: row.text, createdAt: row.created_at,
+  }));
+}
+
+// ── Session Messages ───────────────────────────────────
+
+export async function createSessionMessage(
+  sessionId: string, senderId: string, senderName: string, text: string,
+): Promise<SessionMessageRecord> {
+  const id = makeId("smsg");
+  const now = nowIso();
+  await query(
+    "INSERT INTO session_messages (id, session_id, sender_id, sender_name, text, created_at) VALUES ($1,$2,$3,$4,$5,$6)",
+    [id, sessionId, senderId, senderName, text.trim(), now],
+  );
+  return { id, sessionId, senderId, senderName, text: text.trim(), createdAt: now };
+}
+
+export async function listSessionMessages(sessionId: string): Promise<SessionMessageRecord[]> {
+  const res = await query<{
+    id: string; session_id: string; sender_id: string; sender_name: string;
+    text: string; created_at: string;
+  }>("SELECT * FROM session_messages WHERE session_id = $1 ORDER BY created_at ASC", [sessionId]);
+  return res.rows.map((row) => ({
+    id: row.id, sessionId: row.session_id, senderId: row.sender_id,
+    senderName: row.sender_name, text: row.text, createdAt: row.created_at,
+  }));
+}
+
+// ── Utility ────────────────────────────────────────────
 
 export function getPartnerUserId(match: MatchRecord, userId: string) {
   return match.userA === userId ? match.userB : match.userA;
@@ -429,49 +418,14 @@ export function normalizeString(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-export function hasSavedSubject(userId: string, subject: string) {
+export async function hasSavedSubject(userId: string, subject: string): Promise<boolean> {
+  const subjects = await getProfileSubjects(userId);
   const normalized = normalizeSubject(subject);
-  return getProfileSubjects(userId).some(
-    (savedSubject) => normalizeSubject(savedSubject) === normalized,
-  );
+  return subjects.some((s) => normalizeSubject(s) === normalized);
 }
 
-export function getSubjectOverlap(userA: string, userB: string) {
-  const subjectsA = new Set(getProfileSubjects(userA).map(normalizeSubject));
-  const subjectsB = getProfileSubjects(userB).map(normalizeSubject);
-  return subjectsB.filter((subject) => subjectsA.has(subject));
-}
-
-export function endSession(sessionId: string) {
-  const state = getState();
-  const session = state.sessions.get(sessionId);
-  if (!session) return null;
-  const updated: SessionRecord = { ...session, status: "ended" };
-  state.sessions.set(sessionId, updated);
-  return updated;
-}
-
-export function createSessionMessage(
-  sessionId: string,
-  senderId: string,
-  senderName: string,
-  text: string,
-) {
-  const state = getState();
-  const message: SessionMessageRecord = {
-    id: makeId("smsg"),
-    sessionId,
-    senderId,
-    senderName,
-    text: text.trim(),
-    createdAt: nowIso(),
-  };
-  state.sessionMessages.set(message.id, message);
-  return message;
-}
-
-export function listSessionMessages(sessionId: string) {
-  return Array.from(getState().sessionMessages.values())
-    .filter((m) => m.sessionId === sessionId)
-    .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+export async function getSubjectOverlap(userA: string, userB: string): Promise<string[]> {
+  const subjectsA = new Set((await getProfileSubjects(userA)).map(normalizeSubject));
+  const subjectsB = (await getProfileSubjects(userB)).map(normalizeSubject);
+  return subjectsB.filter((s) => subjectsA.has(s));
 }

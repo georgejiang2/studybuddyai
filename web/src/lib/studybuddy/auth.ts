@@ -6,10 +6,10 @@ import { type AuthSessionUser } from "@/lib/studybuddy/types";
 
 export const SESSION_COOKIE_NAME = "studybuddy_session";
 
-export function getRequestUser(request: NextRequest): AuthSessionUser | null {
+export async function getRequestUser(request: NextRequest): Promise<AuthSessionUser | null> {
   const headerUserId = request.headers.get("x-studybuddy-user-id")?.trim();
   if (headerUserId) {
-    const user = getUser(headerUserId);
+    const user = await getUser(headerUserId);
     return user ? { ...user, authSource: "header" } : null;
   }
 
@@ -18,7 +18,7 @@ export function getRequestUser(request: NextRequest): AuthSessionUser | null {
     return null;
   }
 
-  const user = getUser(sessionUserId);
+  const user = await getUser(sessionUserId);
   return user ? { ...user, authSource: "cookie" } : null;
 }
 

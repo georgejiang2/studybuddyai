@@ -186,7 +186,10 @@ function MatchFound({
             </div>
             <div className={styles.partnerInfo}>
               <h3>{partner.name}</h3>
-              <p>{partner.school} &middot; {partner.major} &middot; {partner.year}</p>
+              <p>{partner.school} &middot; {partner.major} &middot; {partner.year.charAt(0).toUpperCase() + partner.year.slice(1)}</p>
+              {partner.bio && (
+                <p className={styles.partnerBio}>&ldquo;{partner.bio}&rdquo;</p>
+              )}
               {partner.subjects.length > 0 && (
                 <div className={styles.partnerSubjects}>
                   {partner.subjects.map((s) => (

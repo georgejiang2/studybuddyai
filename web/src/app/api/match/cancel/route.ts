@@ -5,11 +5,11 @@ import { ok, unauthorized } from "@/lib/studybuddy/http";
 import { removeQueueEntry } from "@/lib/studybuddy/store";
 
 export async function POST(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
-  removeQueueEntry(user.id);
+  await removeQueueEntry(user.id);
 
   return ok({
     status: "idle",

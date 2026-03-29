@@ -11,7 +11,7 @@ import {
 } from "@/lib/studybuddy/store";
 
 export async function POST(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       ? body.currentSubject.trim()
       : "";
 
-  if (!isProfileComplete(user.id)) {
+  if (!(await isProfileComplete(user.id))) {
     return badRequest("Complete your profile before entering the queue.");
   }
 
@@ -29,15 +29,15 @@ export async function POST(request: NextRequest) {
     return badRequest("currentSubject is required.");
   }
 
-  if (!hasSavedSubject(user.id, currentSubject)) {
+  if (!(await hasSavedSubject(user.id, currentSubject))) {
     return badRequest("currentSubject must be one of the subjects on your profile.");
   }
 
-  if (getActiveSessionForUser(user.id)) {
+  if (await getActiveSessionForUser(user.id)) {
     return conflict("You already have an active session.");
   }
 
-  upsertQueueEntry(user.id, currentSubject);
+  await upsertQueueEntry(user.id, currentSubject);
 
-  return ok(findOrCreateMatch(user.id));
+  return ok(await findOrCreateMatch(user.id));
 }

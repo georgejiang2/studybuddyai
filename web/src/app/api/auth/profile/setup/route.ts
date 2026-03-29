@@ -15,7 +15,7 @@ function isAcademicYear(value: string): value is AcademicYear {
 }
 
 export async function POST(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   const normalizedYear = isAcademicYear(year) ? year : "freshman";
   const subjectList = subjects.filter((subject): subject is string => typeof subject === "string");
 
-  upsertProfile(user.id, {
+  await upsertProfile(user.id, {
     name,
     school,
     major,
@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
 
   return ok({
     user,
-    profile: getProfile(user.id),
-    subjects: getProfileSubjects(user.id),
-    profileCompleted: isProfileComplete(user.id),
+    profile: await getProfile(user.id),
+    subjects: await getProfileSubjects(user.id),
+    profileCompleted: await isProfileComplete(user.id),
   });
 }

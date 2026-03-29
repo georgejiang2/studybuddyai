@@ -10,18 +10,18 @@ import {
   listSessionMessages,
 } from "@/lib/studybuddy/store";
 
-function validateSessionAccess(userId: string, sessionId: string) {
-  const session = getSession(sessionId);
+async function validateSessionAccess(userId: string, sessionId: string) {
+  const session = await getSession(sessionId);
   if (!session) return null;
 
-  const match = getMatch(session.matchId);
+  const match = await getMatch(session.matchId);
   if (!match || (match.userA !== userId && match.userB !== userId)) return null;
 
   return { session, match };
 }
 
 export async function GET(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
@@ -31,16 +31,16 @@ export async function GET(request: NextRequest) {
     return badRequest("sessionId query param is required.");
   }
 
-  const access = validateSessionAccess(user.id, sessionId);
+  const access = await validateSessionAccess(user.id, sessionId);
   if (!access) {
     return notFound("Session not found or access denied.");
   }
 
-  return ok({ messages: listSessionMessages(sessionId) });
+  return ok({ messages: await listSessionMessages(sessionId) });
 }
 
 export async function POST(request: NextRequest) {
-  const user = getRequestUser(request);
+  const user = await getRequestUser(request);
   if (!user) {
     return unauthorized();
   }
@@ -54,15 +54,15 @@ export async function POST(request: NextRequest) {
     return badRequest("sessionId and text are required.");
   }
 
-  const access = validateSessionAccess(user.id, sessionId);
+  const access = await validateSessionAccess(user.id, sessionId);
   if (!access) {
     return notFound("Session not found or access denied.");
   }
 
-  const profile = getProfile(user.id);
+  const profile = await getProfile(user.id);
   const senderName = profile?.name ?? user.email;
 
   return ok({
-    message: createSessionMessage(sessionId, user.id, senderName, text),
+    message: await createSessionMessage(sessionId, user.id, senderName, text),
   });
 }
