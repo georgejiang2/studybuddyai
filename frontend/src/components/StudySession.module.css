@@ -12,6 +12,7 @@
   display: flex;
   flex-direction: column;
   transition: margin-right 0.25s ease;
+  position: relative;
 }
 
 .videoAreaShift {
@@ -95,6 +96,27 @@
   font-size: 0.8125rem;
   color: #a0a0ad;
   background: #111113;
+}
+
+.audioPrompt {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(17, 17, 19, 0.92);
+  color: #f0f0f2;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.audioPrompt:hover {
+  background: rgba(39, 39, 45, 0.96);
 }
 
 /* Controls */

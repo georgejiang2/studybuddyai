@@ -3,6 +3,7 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   VideoTrack,
+  useAudioPlayback,
   useTracks,
   useRoomContext,
   useParticipants,
@@ -261,6 +262,7 @@ function SessionContent({
   onEnd: () => void;
 }) {
   const room = useRoomContext();
+  const { canPlayAudio, startAudio } = useAudioPlayback(room);
   const connectionState = useConnectionState();
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
@@ -341,6 +343,19 @@ function SessionContent({
   return (
     <>
       <div className={`${styles.videoArea} ${chatOpen ? styles.videoAreaShift : ''}`}>
+        {!canPlayAudio && (
+          <button
+            type="button"
+            className={styles.audioPrompt}
+            onClick={() => {
+              startAudio().catch(() => {
+                // ignore, button stays visible until playback is allowed
+              });
+            }}
+          >
+            Click to enable call audio
+          </button>
+        )}
         <div className={styles.videoGrid}>
           <div className={styles.videoTile}>
             {localVideoTrack ? (
