@@ -116,6 +116,8 @@
 
 .main {
   padding: 48px 24px 64px;
+  display: flex;
+  justify-content: center;
 }
 
 .friendsMain {
@@ -134,7 +136,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .homeLeft {
@@ -142,9 +144,20 @@
   flex-direction: column;
 }
 
+.homeLeft .card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .homeRight {
   display: flex;
   flex-direction: column;
+}
+
+.homeRight .info {
+  flex: 1;
 }
 
 @media (max-width: 768px) {
@@ -157,6 +170,7 @@
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.025em;
+  text-align: center;
 }
 
 .sub {
@@ -165,6 +179,7 @@
   margin-top: 8px;
   margin-bottom: 32px;
   line-height: 1.5;
+  text-align: center;
 }
 
 .error {

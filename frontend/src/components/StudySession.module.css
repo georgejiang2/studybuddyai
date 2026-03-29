@@ -130,6 +130,7 @@
 }
 
 .controlBtn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,10 +181,6 @@
 }
 
 /* Chat badge */
-.controlBtn {
-  position: relative;
-}
-
 .badge {
   position: absolute;
   top: -4px;

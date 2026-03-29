@@ -472,7 +472,7 @@ function ProfileEditor({
       {profile?.year && (
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>Year</span>
-          <span className={styles.infoValue}>{profile.year}</span>
+          <span className={styles.infoValue}>{profile.year.charAt(0).toUpperCase() + profile.year.slice(1)}</span>
         </div>
       )}
       {subjects.length > 0 && (
